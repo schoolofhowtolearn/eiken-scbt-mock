@@ -1,0 +1,960 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>英検S-CBT模擬試験</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Layout: CBT terminal — fixed exam header (級・技能・受験者・残り時間・中止), working area, fixed bottom toolbar. */
+:root{
+  --bg:#e4e8ee; --surface:#ffffff; --sunk:#f2f4f7; --ink:#1a2230; --muted:#5a6476; --line:#c4ccd8; --line2:#9aa6b8;
+  --bar:#24466f; --bar2:#1a3554; --bar-ink:#f2f5fa; --tool:#d7dde6; --tool-ink:#1a2230;
+  --accent:#d08a1e; --accent-soft:#fcefd6; --rec:#d23b3b; --rec-soft:#fbe3e3;
+  --ok:#2c7a4b; --ok-soft:#e1f1e7; --ng:#b03a3a; --ng-soft:#f8e2e2; --sel:#1f5aa6; --sel-soft:#e1ebf8;
+  --ill-skin:#f2c9a5; --ill-a:#3d7bc4; --ill-b:#d9534f; --ill-green:#6fa35a; --ill-wood:#c99a62; --ill-line:#2b3443; --ill-hair:#3a2e28; --ill-bg:#f8f5ee; --vid:#2f3d4f;
+  --ui:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+  --en:"Atkinson Hyperlegible","Segoe UI",Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e131a; --surface:#18202b; --sunk:#121922; --ink:#e5e9ef; --muted:#9aa5b6; --line:#2e3a4b; --line2:#4a5870;
+  --bar:#1b3555; --bar2:#132840; --bar-ink:#e8eef7; --tool:#1f2935; --tool-ink:#e5e9ef;
+  --accent:#e6a44a; --accent-soft:#3a2d17; --rec:#ef6b6b; --rec-soft:#3d1c1c;
+  --ok:#5cbf85; --ok-soft:#183325; --ng:#e47b7b; --ng-soft:#3a1d1d; --sel:#7fb0ee; --sel-soft:#1b2c44;
+  --ill-skin:#e0b48f; --ill-a:#5b93d6; --ill-b:#e06a66; --ill-green:#6f9f5c; --ill-wood:#a87d4c; --ill-line:#cfd7e3; --ill-hair:#6b5242; --ill-bg:#202a37; --vid:#0b1119; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e131a; --surface:#18202b; --sunk:#121922; --ink:#e5e9ef; --muted:#9aa5b6; --line:#2e3a4b; --line2:#4a5870;
+  --bar:#1b3555; --bar2:#132840; --bar-ink:#e8eef7; --tool:#1f2935; --tool-ink:#e5e9ef;
+  --accent:#e6a44a; --accent-soft:#3a2d17; --rec:#ef6b6b; --rec-soft:#3d1c1c;
+  --ok:#5cbf85; --ok-soft:#183325; --ng:#e47b7b; --ng-soft:#3a1d1d; --sel:#7fb0ee; --sel-soft:#1b2c44;
+  --ill-skin:#e0b48f; --ill-a:#5b93d6; --ill-b:#e06a66; --ill-green:#6f9f5c; --ill-wood:#a87d4c; --ill-line:#cfd7e3; --ill-hair:#6b5242; --ill-bg:#202a37; --vid:#0b1119; color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--ui);font-size:15px;line-height:1.7}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bar)}
+.gut{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.in{max-width:1080px;margin:0 auto}
+
+/* ---------- header ---------- */
+header.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:6;color:var(--bar-ink)}
+.bar1{background:var(--bar);padding-block:8px}
+.bar1 .in{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.lv{font-weight:700;font-size:13px;border:1px solid rgba(255,255,255,.45);border-radius:3px;padding:2px 8px;white-space:nowrap}
+.sec{font-weight:700;font-size:16px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who{font-size:12px;opacity:.8;white-space:nowrap}
+.tbox{display:flex;align-items:center;gap:8px;background:var(--bar2);border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:3px 10px;min-width:9.5em;justify-content:space-between}
+.tbox small{font-size:11px;opacity:.75;white-space:nowrap}
+.tbox b{font-size:20px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.tbox.warn b{color:var(--accent)}
+.abort{font:inherit;font-size:13px;font-weight:700;border:1px solid rgba(255,255,255,.55);background:transparent;color:var(--bar-ink);border-radius:3px;padding:4px 12px;cursor:pointer;min-height:34px}
+.abort:hover{background:rgba(255,255,255,.12)}
+.bar2{background:var(--bar2);padding-block:4px}
+.bar2 .in{display:flex;gap:4px;flex-wrap:wrap;align-items:center;font-size:12px}
+.bar2 span{padding:2px 10px;border-radius:2px;opacity:.55}
+.bar2 span.on{background:var(--accent);color:#1b1305;opacity:1;font-weight:700}
+.bar2 span.done{opacity:.85}
+.bar2 span.done::before{content:"✓ "}
+.vol{margin-left:auto;display:flex;align-items:center;gap:6px;opacity:.95}
+.vol input{width:110px;accent-color:var(--accent)}
+
+main{padding-block:16px 24px}
+main.hasfoot{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+main>.in{display:flex;flex-direction:column;gap:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:20px clamp(16px,3vw,26px)}
+h1{font-size:clamp(21px,3.6vw,28px);line-height:1.35;margin:0;text-wrap:balance}
+h2{font-size:17px;margin:0;text-wrap:balance}
+p{margin:0}
+.muted{color:var(--muted)}
+.stack{display:flex;flex-direction:column;gap:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.en{font-family:var(--en);font-size:17px;line-height:1.8}
+.note{font-size:13px;color:var(--muted);border-left:3px solid var(--line);padding-left:10px}
+.btn{font:inherit;font-weight:700;border:1px solid var(--line2);background:var(--surface);color:var(--ink);padding:9px 18px;border-radius:3px;cursor:pointer;min-height:44px;box-shadow:0 1px 0 var(--line)}
+.btn:hover{background:var(--sunk)}
+.btn.primary{background:var(--sel);border-color:var(--sel);color:var(--surface)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.warn{border-color:var(--accent)}
+.btn.danger{border-color:var(--ng);color:var(--ng)}
+.btn.flag[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+input[type=text],select{font:inherit;padding:8px 12px;border:1px solid var(--line2);border-radius:3px;background:var(--sunk);color:var(--ink);max-width:100%}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:640px){.grid2{grid-template-columns:1fr}}
+.grades{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.scopes{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.scopes .gbtn b{font-size:16px}
+.gbtn{font:inherit;text-align:left;border:1.5px solid var(--line2);background:var(--surface);color:var(--ink);border-radius:4px;padding:10px 14px;cursor:pointer;display:flex;flex-direction:column;min-width:0}
+.gbtn b{font-size:20px;line-height:1.3}
+.gbtn span{font-size:12px;color:var(--muted)}
+.gbtn:hover{background:var(--sunk)}
+.gbtn[aria-checked="true"]{border-color:var(--sel);background:var(--sel-soft);box-shadow:inset 0 0 0 1px var(--sel)}
+.flow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.flow div{padding:12px 14px;border-right:1px solid var(--line);background:var(--sunk);min-width:0}
+.flow div:last-child{border-right:0}
+.flow b{display:block}
+.flow span{font-size:12.5px;color:var(--muted);display:block;line-height:1.55}
+.flow i{font-style:normal;font-size:11px;color:var(--accent);font-weight:700;letter-spacing:.1em}
+@media (max-width:640px){.flow{grid-template-columns:1fr}.flow div{border-right:0;border-bottom:1px solid var(--line)}.flow div:last-child{border-bottom:0}}
+
+/* ---------- question frame ---------- */
+.qbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--sunk);border:1px solid var(--line);border-bottom:0;border-radius:4px 4px 0 0;padding:8px 14px}
+.qbar b{font-size:15px}
+.qbar .qn{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.qframe{background:var(--surface);border:1px solid var(--line);border-radius:0 0 4px 4px;padding:18px clamp(14px,2.6vw,24px);display:flex;flex-direction:column;gap:14px}
+.direc{font-size:14px;background:var(--sunk);border-left:4px solid var(--bar);padding:8px 12px}
+.split{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:18px;align-items:start}
+.split .pane{min-width:0}
+@media (min-width:861px){.split .pane.scroll{max-height:calc(100vh - 290px);overflow:auto;padding-right:6px}}
+@media (max-width:860px){.split{grid-template-columns:1fr}}
+.passage{background:var(--surface);border:1px solid var(--line2);padding:14px 16px}
+.passage h4{font-family:var(--en);text-align:center;margin:0 0 6px;font-size:17px}
+.mail-h{font-family:var(--en);font-size:14px;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:10px;line-height:1.6}
+.qstem{display:flex;gap:10px;align-items:flex-start}
+.qstem .no{flex:none;font-weight:700;font-variant-numeric:tabular-nums;font-family:var(--en);font-size:17px;line-height:1.8}
+.opts{display:flex;flex-direction:column;gap:6px}
+.opt{display:flex;gap:12px;align-items:center;text-align:left;font:inherit;width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:3px;background:var(--surface);color:var(--ink);cursor:pointer;min-height:46px}
+.opt:hover{background:var(--sunk)}
+.opt .rd{flex:none;width:20px;height:20px;border-radius:50%;border:2px solid var(--line2);display:grid;place-items:center}
+.opt .rd::after{content:"";width:10px;height:10px;border-radius:50%;background:transparent}
+.opt .k{flex:none;font-weight:700;width:1.2em;font-variant-numeric:tabular-nums}
+.opt .t{font-family:var(--en);font-size:16.5px;min-width:0}
+.opt[aria-checked="true"]{border-color:var(--sel);background:var(--sel-soft)}
+.opt[aria-checked="true"] .rd{border-color:var(--sel)}
+.opt[aria-checked="true"] .rd::after{background:var(--sel)}
+.opts.inline{flex-direction:row;flex-wrap:wrap}
+.opts.inline .opt{width:auto;flex:1 1 110px}
+.blank{font-family:var(--en);font-weight:700;border-bottom:1.5px solid var(--ink);padding:0 6px}
+
+/* ---------- fixed toolbar ---------- */
+footer.tool{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--tool);color:var(--tool-ink);border-top:1px solid var(--line2);
+  padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+footer.tool .in{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+footer.tool .grp{display:flex;gap:8px;flex-wrap:wrap}
+footer.tool .msg{font-size:12.5px;color:var(--muted)}
+
+/* ---------- pause / abort dialog ---------- */
+.ovl{position:fixed;inset:0;z-index:20;background:rgba(8,14,22,.6);display:grid;place-items:center;
+  padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px))}
+.ovl[hidden],.tbox[hidden]{display:none!important}
+.dlg{background:var(--surface);color:var(--ink);border-radius:6px;border:1px solid var(--line);max-width:460px;width:100%;padding:22px;display:flex;flex-direction:column;gap:12px}
+.dlg .col{display:flex;flex-direction:column;gap:8px}
+.dlg .col .btn{width:100%}
+
+/* ---------- overview ---------- */
+.ovgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.ov{font:inherit;text-align:left;border:1px solid var(--line2);background:var(--surface);color:var(--ink);border-radius:3px;padding:8px 10px;cursor:pointer;display:flex;flex-direction:column;gap:2px;position:relative;min-width:0}
+.ov:hover{background:var(--sunk)}
+.ov b{font-variant-numeric:tabular-nums}
+.ov span{font-size:12px;color:var(--muted)}
+.ov.ans{background:var(--sel-soft);border-color:var(--sel)}
+.ov .st{font-weight:700;font-size:12px;color:var(--ng)}
+.ov.ans .st{color:var(--sel)}
+.ov.flg::after{content:"見直し";position:absolute;top:6px;right:8px;font-size:11px;font-weight:700;background:var(--accent);color:#1b1305;padding:0 6px;border-radius:2px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.dialog{border:2px solid var(--accent);background:var(--accent-soft);border-radius:4px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+
+/* ---------- speaking ---------- */
+.spk{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:16px;align-items:start}
+@media (max-width:860px){.spk{grid-template-columns:1fr}}
+.video{background:var(--vid);border-radius:4px;overflow:hidden;position:relative;aspect-ratio:4/3;max-width:100%}
+.video svg{width:100%;height:100%;display:block}
+.video .cap{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);color:#fff;font-family:var(--en);font-size:15px;padding:8px 12px;line-height:1.5}
+.mouth{transform-origin:150px 128px;transform-box:view-box}
+.talking .mouth{animation:talk .22s infinite alternate}
+@keyframes talk{from{transform:scaleY(.3)}to{transform:scaleY(1.4)}}
+.recbox{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:4px;padding:10px 14px;background:var(--sunk)}
+.mic{flex:none;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:var(--surface);border:2px solid var(--line2);color:var(--muted)}
+.mic svg{width:22px;height:22px}
+.mic.on{background:var(--rec);border-color:var(--rec);color:#fff;animation:pulse 1.2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 var(--rec-soft)}100%{box-shadow:0 0 0 12px transparent}}
+.recbox .lbl{font-weight:700}
+.recbox .lbl.on{color:var(--rec)}
+.recbox .cd{margin-left:auto;font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+.bar-m{height:6px;background:var(--surface);border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.bar-m i{display:block;height:100%;width:0;background:var(--sel)}
+.bar-m.on i{background:var(--rec)}
+.qcard{border:2px solid var(--line2);background:var(--surface);padding:16px}
+.qcard h3{font-family:var(--en);text-align:center;margin:0 0 6px;font-size:18px}
+.qcard .back{display:grid;place-items:center;min-height:200px;color:var(--muted);font-size:14px;text-align:center}
+svg.pic{width:100%;height:auto;display:block;border:1px solid var(--line);background:var(--ill-bg);margin-top:12px}
+.pics{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:12px}
+.pics.three{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.pics figure{margin:0;display:flex;flex-direction:column;gap:4px;min-width:0}
+.pics figcaption{font-weight:700;font-size:13px;font-family:var(--en)}
+.pics svg{width:100%;height:auto;display:block;border:1px solid var(--line);background:var(--ill-bg)}
+.opening{font-family:var(--en);border:1.5px solid var(--line2);padding:6px 10px;font-size:15px;margin-top:10px;line-height:1.6}
+.script{font-family:var(--en);font-size:15px;background:var(--sunk);border:1px dashed var(--line2);padding:8px 12px}
+
+/* ---------- listening ---------- */
+.lstage{display:flex;align-items:center;gap:14px;border:1px solid var(--line);background:var(--sunk);border-radius:4px;padding:12px 14px;flex-wrap:wrap}
+.spk-ic{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--surface);border:2px solid var(--line2);color:var(--muted)}
+.spk-ic.on{border-color:var(--sel);color:var(--sel)}
+.spk-ic svg{width:20px;height:20px}
+.lstage .lbl{font-weight:700}
+.lstage .bar-m{flex:1;min-width:120px}
+
+/* ---------- writing ---------- */
+textarea{font-family:var(--en);font-size:16px;line-height:1.7;width:100%;min-height:220px;padding:12px;border:1px solid var(--line2);border-radius:2px;background:var(--surface);color:var(--ink);resize:vertical}
+.wc{font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.wc b{color:var(--ink)}
+.u{text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1.5px}
+.points{font-family:var(--en);font-size:15px;border-top:1px solid var(--line);margin-top:8px;padding-top:6px}
+
+/* ---------- results ---------- */
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.sum div{background:var(--sunk);border:1px solid var(--line);border-radius:4px;padding:12px;min-width:0}
+.sum b{display:block;font-size:24px;font-variant-numeric:tabular-nums;line-height:1.2}
+.sum b.na{font-size:16px;color:var(--muted);padding-top:6px}
+.sum span{font-size:12px;color:var(--muted)}
+.stopped{display:inline-block;font-size:12px;font-weight:700;color:var(--ng);background:var(--ng-soft);border-radius:3px;padding:1px 8px}
+details{border:1px solid var(--line);border-radius:4px;background:var(--surface)}
+details>summary{cursor:pointer;padding:12px 14px;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:8px}
+details>summary::-webkit-details-marker{display:none}
+details>summary::after{content:"＋";color:var(--muted)}
+details[open]>summary::after{content:"－"}
+.dbody{padding:0 14px 14px;display:flex;flex-direction:column;gap:12px}
+.rv{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:1px 8px;border-radius:3px}
+.tag.ok{background:var(--ok-soft);color:var(--ok)} .tag.ng{background:var(--ng-soft);color:var(--ng)}
+.model{font-family:var(--en);background:var(--ok-soft);border-radius:3px;padding:8px 12px;font-size:15px}
+.mine{font-family:var(--en);background:var(--sunk);border-radius:3px;padding:8px 12px;font-size:15px;white-space:pre-wrap;word-break:break-word}
+.selfrate{display:flex;gap:6px;flex-wrap:wrap}
+.selfrate button{font:inherit;font-size:13px;padding:5px 12px;border:1px solid var(--line2);border-radius:999px;background:var(--surface);color:var(--ink);cursor:pointer}
+.selfrate button[aria-pressed="true"]{background:var(--sel);border-color:var(--sel);color:var(--surface)}
+.ai{border:1px solid var(--sel);border-radius:4px;padding:12px 14px;background:var(--sel-soft);display:flex;flex-direction:column;gap:8px}
+.ai table{border-collapse:collapse;font-size:14px}
+.ai td{padding:3px 10px 3px 0;font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){.talking .mouth,.mic.on{animation:none}}
+</style>
+
+<div class="app">
+  <header class="bar">
+    <div class="bar1 gut"><div class="in">
+      <span class="lv" id="lv">3級</span>
+      <span class="sec" id="secname">英検S-CBT 模擬試験</span>
+      <span class="who" id="who"></span>
+      <div class="tbox" id="tbox" hidden><small id="tlabel">残り時間</small><b id="tval">0:00</b></div>
+      <button class="abort" id="abortBtn" hidden>中止</button>
+    </div></div>
+    <div class="bar2 gut"><div class="in" id="rail"></div></div>
+  </header>
+  <main id="mainwrap" class="gut"><div class="in" id="main"></div></main>
+  <footer class="tool gut" id="tool" hidden><div class="in" id="toolin"></div></footer>
+  <div class="ovl" id="ovl" hidden>
+    <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT">
+      <h2 id="dlgT">試験を一時停止しています</h2>
+      <p id="dlgP" style="font-size:14px"></p>
+      <div class="col">
+        <button class="btn primary" id="dResume">再開する</button>
+        <button class="btn" id="dResult">中止して、ここまでの結果を見る</button>
+        <button class="btn danger" id="dHome">中止してトップに戻る（解答は消えます）</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===================== イラスト部品 ===================== */
+function P(x,y,o={}){
+  const s=o.s||1,c=o.c||"var(--ill-a)",la=o.la||[-6,26],ra=o.ra||[6,26];
+  const legs=o.legs==="sit"?"M-4 -36 L14 -36 L14 -6 M4 -36 L20 -36 L20 -6":o.legs==="walk"?"M-5 -36 L-12 0 M5 -36 L10 0":"M-5 -36 L-6 0 M5 -36 L6 0";
+  const hair=o.long?"M-12 -80 q0 -15 12 -15 q12 0 12 15 v16 h-5 v-14 q-7 -7 -14 0 v14 h-5z":"M-11 -82 q11 -18 22 0 q-3 -8 -11 -9 q-8 1 -11 9z";
+  return `<g transform="translate(${x} ${y}) scale(${s})" stroke="var(--ill-line)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="${legs}" fill="none" stroke-width="3"/>
+    <rect x="-10" y="-68" width="20" height="33" rx="4" fill="${c}"/>
+    <path d="M-9 -64 l${la[0]} ${la[1]} M9 -64 l${ra[0]} ${ra[1]}" fill="none" stroke-width="3"/>
+    <circle cx="0" cy="-80" r="11" fill="var(--ill-skin)"/>
+    <path d="${hair}" fill="var(--ill-hair)" stroke="none"/>
+    <circle cx="-4" cy="-80" r="1.4" fill="var(--ill-line)" stroke="none"/><circle cx="4" cy="-80" r="1.4" fill="var(--ill-line)" stroke="none"/>
+    ${o.smile?'<path d="M-4 -75 q4 4 8 0" fill="none" stroke-width="1.5"/>':""}
+    ${o.extra||""}</g>`;
+}
+const cake=(x,y)=>`<g stroke="var(--ill-line)" stroke-width="2"><rect x="${x-16}" y="${y-12}" width="32" height="16" fill="var(--surface)"/><rect x="${x-16}" y="${y-16}" width="32" height="5" fill="var(--ill-b)"/><circle cx="${x-7}" cy="${y-20}" r="3.5" fill="var(--ill-b)"/><circle cx="${x+7}" cy="${y-20}" r="3.5" fill="var(--ill-b)"/></g>`;
+const lbl=(t)=>`<rect x="6" y="6" width="${t.length*7.4+14}" height="22" rx="3" fill="var(--surface)" stroke="var(--ill-line)" stroke-width="1.5"/><text x="13" y="22" style="font-family:var(--en);font-size:13px;font-weight:700" fill="var(--ink)">${t}</text>`;
+
+function pic3(){
+  return `<svg class="pic" viewBox="0 0 460 250" role="img" aria-label="調理室のイラスト。左の女の子はケーキを思い浮かべている。テーブルにリンゴが3つ。右の男の子は流しで皿を洗っている。">
+  <rect width="460" height="250" fill="var(--ill-bg)"/>
+  ${P(370,140,{c:"var(--ill-a)",la:[-14,26],ra:[14,26],s:.95})}
+  <rect x="300" y="118" width="140" height="80" fill="var(--ill-wood)" stroke="var(--ill-line)" stroke-width="2"/>
+  <rect x="312" y="110" width="116" height="14" rx="3" fill="var(--surface)" stroke="var(--ill-line)" stroke-width="2"/>
+  <path d="M360 110 v-26 h18 v6" fill="none" stroke="var(--ill-line)" stroke-width="3"/>
+  <rect x="120" y="168" width="150" height="12" fill="var(--ill-wood)" stroke="var(--ill-line)" stroke-width="2"/>
+  <line x1="135" y1="180" x2="135" y2="240" stroke="var(--ill-line)" stroke-width="3"/><line x1="255" y1="180" x2="255" y2="240" stroke="var(--ill-line)" stroke-width="3"/>
+  <g fill="var(--ill-b)" stroke="var(--ill-line)" stroke-width="2"><circle cx="160" cy="158" r="10"/><circle cx="184" cy="158" r="10"/><circle cx="208" cy="158" r="10"/></g>
+  ${P(70,240,{long:1,c:"var(--ill-b)",ra:[28,22]})}
+  <circle cx="98" cy="130" r="4" fill="var(--surface)" stroke="var(--ill-line)" stroke-width="2"/><circle cx="108" cy="114" r="6" fill="var(--surface)" stroke="var(--ill-line)" stroke-width="2"/>
+  <ellipse cx="160" cy="72" rx="56" ry="36" fill="var(--surface)" stroke="var(--ill-line)" stroke-width="2"/>
+  ${cake(160,84)}
+  <ellipse cx="370" cy="112" rx="22" ry="5" fill="var(--surface)" stroke="var(--ill-line)" stroke-width="2"/>
+  <g fill="var(--ill-a)" opacity=".7"><circle cx="350" cy="102" r="3"/><circle cx="392" cy="98" r="2.5"/><circle cx="384" cy="104" r="2"/></g></svg>`;
+}
+function picA(){
+  return `<svg viewBox="0 0 480 250" role="img" aria-label="イラストA：公園。花に水をやる女性、ベンチで新聞を読む男性、ボールを投げる男の子、自転車に乗る女の子、写真を撮る男性。">
+  <rect width="480" height="250" fill="var(--ill-bg)"/><rect y="215" width="480" height="35" fill="var(--ill-green)" opacity=".45"/>
+  <g stroke="var(--ill-line)" stroke-width="2"><line x1="104" y1="215" x2="104" y2="190"/><line x1="118" y1="215" x2="118" y2="186"/><line x1="132" y1="215" x2="132" y2="192"/>
+  <circle cx="104" cy="186" r="6" fill="var(--ill-b)"/><circle cx="118" cy="182" r="6" fill="var(--accent)"/><circle cx="132" cy="188" r="6" fill="var(--ill-b)"/></g>
+  ${P(55,215,{long:1,c:"var(--ill-b)",ra:[24,4]})}
+  <g stroke="var(--ill-line)" stroke-width="2"><rect x="84" y="150" width="20" height="16" rx="2" fill="var(--ill-a)"/><line x1="104" y1="154" x2="118" y2="146"/></g>
+  <g fill="var(--ill-a)"><circle cx="121" cy="154" r="2"/><circle cx="124" cy="163" r="2"/><circle cx="120" cy="171" r="2"/></g>
+  <g stroke="var(--ill-line)" stroke-width="2"><rect x="160" y="182" width="90" height="7" fill="var(--ill-wood)"/><line x1="166" y1="189" x2="166" y2="215"/><line x1="244" y1="189" x2="244" y2="215"/></g>
+  ${P(196,219,{legs:"sit",c:"var(--ill-green)",la:[-6,10],ra:[6,10],extra:'<rect x="-18" y="-72" width="36" height="24" fill="var(--surface)"/><path d="M-13 -66 h26 M-13 -60 h26 M-13 -54 h18" stroke-width="1.2"/>'})}
+  ${P(292,215,{s:.8,c:"var(--accent)",ra:[12,-28],la:[-10,20]})}
+  <circle cx="318" cy="130" r="6" fill="var(--surface)" stroke="var(--ill-line)" stroke-width="2"/><path d="M306 140 l-6 4 M309 146 l-7 2" stroke="var(--ill-line)" stroke-width="1.5"/>
+  <g stroke="var(--ill-line)" stroke-width="2.5" fill="none"><circle cx="362" cy="212" r="16"/><circle cx="414" cy="212" r="16"/><path d="M362 212 L382 190 L414 212 M382 190 L400 186 M396 180 L406 180 M378 184 L388 184"/></g>
+  ${P(384,212,{s:.72,long:1,c:"var(--ill-a)",legs:"sit",ra:[22,8],la:[14,10]})}
+  ${P(452,215,{c:"var(--ill-a)",la:[4,-14],ra:[-4,-14],extra:'<rect x="-11" y="-86" width="22" height="13" rx="2" fill="var(--ill-line)"/><circle cx="0" cy="-79.5" r="3.5" fill="var(--ill-bg)"/>'})}
+  </svg>`;
+}
+function picB(){
+  return `<svg viewBox="0 0 300 250" role="img" aria-label="イラストB：男の子が本棚の一番上の本を取ろうとしているが、手が届かない。">
+  <rect width="300" height="250" fill="var(--ill-bg)"/><line x1="0" y1="232" x2="300" y2="232" stroke="var(--ill-line)" stroke-width="2"/>
+  <g stroke="var(--ill-line)" stroke-width="2"><rect x="176" y="20" width="114" height="212" fill="var(--ill-wood)"/>
+  <line x1="176" y1="72" x2="290" y2="72"/><line x1="176" y1="124" x2="290" y2="124"/><line x1="176" y1="176" x2="290" y2="176"/>
+  <rect x="186" y="34" width="10" height="38" fill="var(--ill-a)"/><rect x="198" y="34" width="12" height="38" fill="var(--ill-b)" stroke-width="2.5"/><rect x="212" y="38" width="9" height="34" fill="var(--ill-green)"/>
+  <rect x="186" y="88" width="10" height="36" fill="var(--ill-green)"/><rect x="198" y="90" width="9" height="34" fill="var(--accent)"/><rect x="240" y="86" width="12" height="38" fill="var(--ill-a)"/>
+  <rect x="190" y="142" width="12" height="34" fill="var(--ill-b)"/><rect x="230" y="140" width="10" height="36" fill="var(--ill-a)"/><rect x="242" y="144" width="12" height="32" fill="var(--accent)"/></g>
+  ${P(124,232,{s:.9,c:"var(--accent)",ra:[34,-44],la:[-6,24]})}
+  <circle cx="58" cy="52" r="30" fill="var(--surface)" stroke="var(--ill-line)" stroke-width="2"/><circle cx="92" cy="96" r="4" fill="var(--surface)" stroke="var(--ill-line)" stroke-width="2"/><circle cx="102" cy="112" r="2.5" fill="var(--surface)" stroke="var(--ill-line)" stroke-width="1.5"/>
+  <rect x="50" y="36" width="16" height="32" fill="var(--ill-b)" stroke="var(--ill-line)" stroke-width="2"/></svg>`;
+}
+function panels2(){
+  const f=(inner,cap)=>`<figure><svg viewBox="0 0 240 180" role="img" aria-label="${cap}"><rect width="240" height="180" fill="var(--ill-bg)"/>${inner}</svg></figure>`;
+  const p1=`<rect x="20" y="30" width="56" height="44" fill="var(--surface)" stroke="var(--ill-line)" stroke-width="2"/><line x1="48" y1="30" x2="48" y2="74" stroke="var(--ill-line)" stroke-width="1.5"/>
+    ${P(70,170,{c:"var(--ill-a)"})}${P(130,170,{s:.8,long:1,c:"var(--ill-b)",ra:[8,-6]})}
+    <ellipse cx="184" cy="48" rx="46" ry="32" fill="var(--surface)" stroke="var(--ill-line)" stroke-width="2"/><path d="M152 70 L140 96 L166 76" fill="var(--surface)" stroke="var(--ill-line)" stroke-width="2"/>${cake(184,56)}`;
+  const p2=`${lbl("That afternoon")}<rect x="10" y="38" width="220" height="62" fill="var(--sunk)" stroke="var(--ill-line)" stroke-width="2"/><line x1="10" y1="69" x2="230" y2="69" stroke="var(--ill-line)" stroke-width="1.5"/>
+    <g stroke="var(--ill-line)" stroke-width="1.5"><rect x="20" y="48" width="18" height="21" fill="var(--ill-green)"/><rect x="44" y="50" width="18" height="19" fill="var(--accent)"/><rect x="70" y="76" width="22" height="24" fill="var(--ill-a)"/><rect x="100" y="78" width="18" height="22" fill="var(--ill-green)"/><rect x="186" y="54" width="34" height="15" fill="var(--surface)"/></g>
+    <g fill="var(--ill-b)"><circle cx="193" cy="61" r="3.5"/><circle cx="201" cy="61" r="3.5"/><circle cx="209" cy="61" r="3.5"/></g>
+    ${P(80,172,{c:"var(--ill-a)",ra:[14,10]})}
+    <g stroke="var(--ill-line)" stroke-width="2"><rect x="96" y="116" width="28" height="16" fill="var(--ill-wood)"/></g><g fill="var(--surface)" stroke="var(--ill-line)" stroke-width="1.5"><ellipse cx="104" cy="114" rx="4" ry="5"/><ellipse cx="114" cy="114" rx="4" ry="5"/></g>
+    ${P(152,172,{s:.8,long:1,c:"var(--ill-b)",ra:[22,-30]})}`;
+  const p3=`${lbl("That evening")}<g stroke="var(--ill-line)" stroke-width="2"><rect x="70" y="122" width="100" height="8" fill="var(--ill-wood)"/><line x1="80" y1="130" x2="80" y2="172"/><line x1="160" y1="130" x2="160" y2="172"/></g>
+    ${cake(120,118)}<g stroke="var(--ill-line)" stroke-width="1.5"><line x1="114" y1="98" x2="114" y2="90"/><line x1="126" y1="98" x2="126" y2="90"/></g><g fill="var(--accent)"><circle cx="114" cy="88" r="2"/><circle cx="126" cy="88" r="2"/></g>
+    ${P(48,172,{s:.8,long:1,c:"var(--ill-b)",ra:[18,-6],smile:1})}${P(196,172,{long:1,c:"var(--ill-green)",la:[-12,-26],ra:[12,-26],smile:1})}`;
+  return `<div class="pics three">${f(p1,"1コマ目：居間で、女の子が父親に「ケーキを作りたい」と話している。")}${f(p2,"2コマ目：その日の午後、スーパーで父親が卵をかごに入れ、女の子がいちごを指さしている。")}${f(p3,"3コマ目：その日の夜、テーブルのケーキを見て母親が喜んでいる。")}</div>`;
+}
+
+/* ===================== 問題データ（すべてオリジナル） ===================== */
+const GRADES={
+"3":{label:"3級",sub:"中学卒業程度",rwFull:65,rwShort:25,aloud:30,audience:"日本人の中学生",
+ speak:{title:"Cooking Clubs",
+  passage:"Many students in Japan join clubs at school. Cooking clubs are popular because students can make delicious food with their friends. Some students make cookies for their families, so they enjoy cooking at home, too.",
+  art:()=>pic3(),
+  intro:"No.2・No.3はイラストについて、No.4・No.5はあなた自身について答えます。",
+  qs:[
+   {n:1,card:"front",ans:15,q:"Please look at the passage. Why are cooking clubs popular?",a:"Because students can make delicious food with their friends."},
+   {n:2,card:"front",ans:15,q:"Please look at the picture. What is the boy doing?",a:"He is washing the dishes."},
+   {n:3,card:"front",ans:15,q:"Please look at the girl. What is she going to do?",a:"She is going to make a cake."},
+   {n:4,card:"back",ans:20,pre:["Now, please turn the card over."],q:"What do you usually do on weekends?",a:"I usually play soccer with my friends."},
+   {n:5,card:"back",ans:20,q:"Do you like to cook?",follow:"Yes. → Please tell me more.　／　No. → Why not?",a:"Yes. I often make curry and rice for my family."}],
+  tip:"主語と動詞のある文（He is ～ing. / She is going to ～.）で答えるのがポイントです。"},
+ listenIntro:["第1部：対話を聞き、最後の発言に対する応答を、放送される3つの選択肢から選びます。","第2部：対話と質問を聞き、答えを画面の4つの選択肢から選びます。","第3部：英文と質問を聞き、答えを画面の4つの選択肢から選びます。"],
+ ldir:{1:"イラストを参考にしながら対話と応答を聞き、最も適切な応答を1, 2, 3の中から一つ選びなさい。（このミニ版ではイラストを省略しています）",2:"対話と質問を聞き、その答えとして最も適切なものを1, 2, 3, 4の中から一つ選びなさい。",3:"英文と質問を聞き、その答えとして最も適切なものを1, 2, 3, 4の中から一つ選びなさい。"},
+ listen:[
+  {part:1,read:1,lines:[["W","Hi, Ken. Are you going to the library?"],["M","Yes. I need to return these books."],["W","Can I go with you?"]],opts:["Sure, let's go together.","It's on the table.","I read it yesterday."],ans:0,jp:"一緒に行ってもいいか、と聞かれているので「もちろん、一緒に行こう」が自然。"},
+  {part:1,read:1,lines:[["M","Excuse me. How much is this T-shirt?"],["W","It's fifteen dollars."],["M","Do you have a smaller one?"]],opts:["It's blue.","Yes, here you are.","At ten o'clock."],ans:1,jp:"もっと小さいサイズはあるかと聞かれ「はい、どうぞ」と差し出す応答。"},
+  {part:2,lines:[["W","Tom, did you finish your homework?"],["M","Not yet, Mom. I'll do it after dinner."],["W","OK, but don't watch TV too long."]],q:"When will Tom do his homework?",opts:["Before dinner.","After dinner.","Tomorrow morning.","At school."],ans:1,jp:"Tom は I'll do it after dinner. と言っている。"},
+  {part:2,lines:[["M","Lisa, what did you do last Sunday?"],["W","I went to the zoo with my sister. We saw baby pandas."],["M","That sounds fun!"]],q:"Who did Lisa go to the zoo with?",opts:["Her mother.","Her friend.","Her sister.","Her brother."],ans:2,jp:"with my sister と言っている。"},
+  {part:3,lines:[["N","My name is Yuki. I usually walk to school, but today it was raining, so my father drove me. I got to school early."]],q:"How did Yuki go to school today?",opts:["She walked.","By bike.","By bus.","By car."],ans:3,jp:"今日は雨だったので父親が車で送った（my father drove me）。"},
+  {part:3,lines:[["N","Attention, shoppers. The store will close in thirty minutes. Today, all apples are half price. Please come to the fruit corner."]],q:"What is half price today?",opts:["Bananas.","Apples.","Oranges.","Bread."],ans:1,jp:"all apples are half price と案内している。"}],
+ rdir:{1:"次の(　　)に入れるのに最も適切なものを1, 2, 3, 4の中から一つ選びなさい。",2:"次の会話について、(　　)に入れるのに最も適切なものを1, 2, 3, 4の中から一つ選びなさい。",3:"次のEメールの内容に関して、質問に対する答えとして最も適切なもの、または文を完成させるのに最も適切なものを1, 2, 3, 4の中から一つ選びなさい。"},
+ pas:{mail:{head:"From: Emma Wilson<br>To: Haruka Sato<br>Date: October 20<br>Subject: Science festival",
+  body:"Hi Haruka,<br><br>Thank you for your letter. Next Saturday, there will be a science festival at the city museum. My father works there, so he gave me two tickets. Would you like to come with me?<br><br>The festival starts at 10 a.m. There are many fun events. For example, we can make robots and watch a show about stars. I want to see the star show the most because I love space. After the festival, let's eat lunch at the café near the museum. My mother says their pancakes are great.<br><br>Please write back by Thursday.<br><br>Your friend,<br>Emma"}},
+ read:[
+  {part:1,q:"I was very (　　) after running for an hour, so I drank a lot of water.",opts:["thirsty","sleepy","angry","busy"],ans:0,jp:"「たくさん水を飲んだ」→ thirsty（のどが渇いた）。"},
+  {part:1,q:"A: What do you want to be in the (　　), Mika?<br>B: I want to be a nurse.",opts:["history","future","culture","world"],ans:1,jp:"in the future で「将来」。"},
+  {part:1,q:"My brother is good (　　) playing the guitar.",opts:["on","for","at","with"],ans:2,jp:"be good at ～ing「～するのが得意だ」。"},
+  {part:1,q:"This book was (　　) by a famous writer.",opts:["write","wrote","written","writing"],ans:2,jp:"受け身 be動詞＋過去分詞。write – wrote – written。"},
+  {part:2,q:"<i>Girl:</i> Can you help me carry these boxes?<br><i>Boy:</i> (　　) Where should I put them?",opts:["No problem.","I'm sorry I'm late.","It's my favorite.","Here you are."],ans:0,jp:"手伝いを頼まれて「いいよ」→ No problem."},
+  {part:2,q:"<i>Man:</i> How long have you lived in this town?<br><i>Woman:</i> (　　)",opts:["By bus.","About two kilometers.","Since I was five.","Next month."],ans:2,jp:"How long have you ～? は期間を聞く。Since ～「～以来」。"},
+  {part:3,pas:"mail",q:"Why does Emma have tickets for the festival?",opts:["She bought them online.","Haruka sent them to her.","Her father gave them to her.","She won them at school."],ans:2,jp:"My father works there, so he gave me two tickets."},
+  {part:3,pas:"mail",q:"What does Emma want to see the most?",opts:["A robot contest.","A show about stars.","A movie about animals.","A cooking show."],ans:1,jp:"I want to see the star show the most."},
+  {part:3,pas:"mail",q:"What does Emma ask Haruka to do?",opts:["Write back by Thursday.","Make pancakes.","Meet her at 9 a.m.","Bring her father."],ans:0,jp:"Please write back by Thursday."}],
+ writeDesc:"ライティングはEメール（15〜25語）と英作文（25〜35語）の2問です。",
+ write:[
+  {label:"Eメール",min:15,max:25,
+   instr:"あなたは、外国人の友達（Alex）から以下のEメールを受け取りました。Eメールを読み、それに対する返信メールを英文で書きなさい。あなたが書く返信メールの中で、友達（Alex）からの2つの質問（下線部）に対応する内容を、あなた自身で自由に考えて答えなさい。語数の目安は15語～25語です。解答欄の外に書かれたものは採点されません。",
+   prompt:"Hi!<br>I heard you went to a summer festival last weekend. I've never been to a Japanese festival. <span class=\"u\">What did you eat there?</span> And <span class=\"u\">who did you go with?</span><br>Your friend,<br>Alex",
+   plain:"Hi! I heard you went to a summer festival last weekend. I've never been to a Japanese festival. What did you eat there? And who did you go with? Your friend, Alex",
+   before:"Hi, Alex!<br>Thank you for your e-mail.",after:"Best wishes,",
+   model:"I ate takoyaki and shaved ice there. They were really good. I went with my sister and two friends from my class."},
+  {label:"英作文",min:25,max:35,
+   instr:"あなたは、外国人の友達から以下のQUESTIONをされました。QUESTIONについて、あなたの考えとその理由を2つ英文で書きなさい。語数の目安は25語～35語です。解答欄の外に書かれたものは採点されません。解答がQUESTIONに対応していないと判断された場合は、0点と採点されることがあります。",
+   prompt:"<b>QUESTION</b><br>Which do you like better, spring or fall?",plain:"QUESTION: Which do you like better, spring or fall?",
+   model:"I like spring better than fall. First, I can see beautiful cherry blossoms in my town. Second, a new school year starts in spring, so I can make new friends."}],
+ rubric:"Eメール問題の観点: 内容(下線部の質問2つに答えているか)・語彙・文法 各0-3点。\n英作文(意見論述)の観点: 内容・構成・語彙・文法 各0-4点。"
+},
+
+"p2":{label:"準2級",sub:"高校中級程度",rwFull:80,rwShort:30,aloud:40,audience:"日本人の高校生",
+ speak:{title:"Online Shopping",
+  passage:"Today, many people buy things on the Internet. Online shopping is useful because people can buy things at any time. However, some people worry about their personal information, so they are careful when they shop online. Online shopping will probably become even more popular in the future.",
+  art:()=>`<div class="pics"><figure><figcaption>A</figcaption>${picA()}</figure><figure><figcaption>B</figcaption>${picB()}</figure></div>`,
+  intro:"No.2はイラストAの人物の行動を、No.3はイラストBの人物の状況を説明します。No.4・No.5はあなたの意見を答えます。",
+  qs:[
+   {n:1,card:"front",ans:20,q:"According to the passage, why are some people careful when they shop online?",a:"Because they worry about their personal information."},
+   {n:2,card:"front",ans:40,pre:["Now, look at the people in Picture A.","They are doing different things."],q:"Tell me as much as you can about what they are doing.",a:"A woman is watering the flowers. A man is reading a newspaper. A boy is throwing a ball. A girl is riding a bicycle. A man is taking a picture."},
+   {n:3,card:"front",ans:20,pre:["Now, look at the boy in Picture B."],q:"Please describe the situation.",a:"He wants to take a book from the shelf, but he can't reach it."},
+   {n:4,card:"back",ans:30,pre:["Now, please turn the card over."],q:"Do you think more people will shop online in the future?",follow:"Yes. → Why?　／　No. → Why not?",a:"Yes. Online shopping is convenient, so busy people can buy things without going to stores."},
+   {n:5,card:"back",ans:30,q:"These days, many students use tablets to study at school. Do you like studying with a tablet?",follow:"Yes. → Please tell me more.　／　No. → Why not?",a:"Yes. I can watch videos to understand difficult topics, and I don't need to carry heavy textbooks."}],
+  tip:"No.2は5人の動作を「A man is ～ing.」の形で、できるだけ多く言うのがコツです。No.3は「～したいが、…できない」の形でまとめます。"},
+ listenIntro:["第1部：対話を聞き、最後の発言に対する応答を、放送される3つの選択肢から選びます。","第2部：対話と質問を聞き、答えを画面の4つの選択肢から選びます。","第3部：英文と質問を聞き、答えを画面の4つの選択肢から選びます。"],
+ ldir:{1:"対話を聞き、その最後の文に対する応答として最も適切なものを、放送される1, 2, 3の中から一つ選びなさい。",2:"対話と質問を聞き、その答えとして最も適切なものを1, 2, 3, 4の中から一つ選びなさい。",3:"英文と質問を聞き、その答えとして最も適切なものを1, 2, 3, 4の中から一つ選びなさい。"},
+ listen:[
+  {part:1,read:1,lines:[["W","Excuse me. I'd like to send this package to Osaka."],["M","Sure. Would you like it to arrive by tomorrow?"],["W","Yes, please. How much will that cost?"]],opts:["It'll be 1,200 yen.","It's about two kilograms.","You can pick it up at five."],ans:0,jp:"料金を聞かれているので金額で答える。"},
+  {part:1,read:1,lines:[["M","Mom, have you seen my soccer shoes?"],["W","I think you left them in the car."],["M","Oh, really? Can I have the car key?"]],opts:["They're too small for you.","Sure. It's on the kitchen table.","I bought them last week."],ans:1,jp:"車のかぎを貸してと頼まれ「いいよ、台所のテーブルにある」。"},
+  {part:2,lines:[["M","Hello, this is Sakura Restaurant."],["W","Hi. I'd like to make a reservation for four people this Friday at seven."],["M","I'm sorry, but we're full at seven. How about eight?"],["W","That's fine."]],q:"What time will the woman go to the restaurant?",opts:["At 4:00.","At 7:00.","At 8:00.","At 9:00."],ans:2,jp:"7時は満席で、8時の提案に That's fine. と答えている。"},
+  {part:2,lines:[["W","Did you finish the science report?"],["M","Not yet. I couldn't find enough information at the library."],["W","Why don't you ask Mr. Brown? He knows a lot about plants."],["M","Good idea. I'll talk to him after lunch."]],q:"What will the boy do after lunch?",opts:["Go to the library.","Talk to his teacher.","Buy some plants.","Finish his report."],ans:1,jp:"Mr. Brown（先生）に話を聞くと言っている。"},
+  {part:3,lines:[["N","Mika started taking piano lessons when she was six. At first, she didn't like practicing, but she wanted to play songs for her grandmother. Last month, she played at a concert, and her grandmother cried with joy."]],q:"Why did Mika keep practicing the piano?",opts:["She wanted to be a teacher.","She wanted to play for her grandmother.","Her parents told her to.","She wanted to win a contest."],ans:1,jp:"祖母のために曲を弾きたかった（she wanted to play songs for her grandmother）。"},
+  {part:3,lines:[["N","Thank you for visiting Green Hill Zoo. Today, our new koala will be shown to visitors for the first time. Please note that you can't take pictures with a flash. The koala house is next to the gift shop."]],q:"What are visitors asked not to do?",opts:["Feed the koala.","Visit the gift shop.","Use a camera flash.","Talk loudly."],ans:2,jp:"you can't take pictures with a flash と案内している。"}],
+ rdir:{1:"次の(　　)に入れるのに最も適切なものを1, 2, 3, 4の中から一つ選びなさい。",2:"次の会話について、(　　)に入れるのに最も適切なものを1, 2, 3, 4の中から一つ選びなさい。",3:"次の英文を読み、その文意にそって(　　)に入れるのに最も適切なものを1, 2, 3, 4の中から一つ選びなさい。",4:"次のEメールの内容に関して、質問に対する答えとして最も適切なもの、または文を完成させるのに最も適切なものを1, 2, 3, 4の中から一つ選びなさい。"},
+ pas:{
+  nami:{title:"Nami's New Hobby",body:"Nami is a high school student. Last year, her grandfather gave her an old camera. At first, she didn't know how to use it, so she <span class=\"blank\">(7)</span>. He taught her how to take good pictures. Now, Nami takes pictures of flowers and birds every weekend.<br><br>In September, she entered a photo contest, and one of her pictures <span class=\"blank\">(8)</span>. She was very happy and decided to join the photography club at school."},
+  mail:{head:"From: Kevin Lee<br>To: Daichi Mori<br>Date: May 12<br>Subject: Beach cleanup",
+   body:"Hi Daichi,<br><br>How are you? I'm writing to tell you about a volunteer event at Minato Beach next month. Every year, many people come to the beach in summer, and they leave a lot of trash there. Last year, about 200 volunteers cleaned the beach in one morning. This year, the city is hoping to get even more people.<br><br>The event will be on Sunday, June 8. Volunteers will meet in front of the beach house at 8 a.m. The city will give everyone gloves and bags, so we don't need to bring them. But we should bring something to drink because it will be hot.<br><br>My sister will join us, too. She is a university student and studies the environment. After the cleanup, she wants to show us how plastic trash hurts sea animals. I think it'll be interesting. Let me know if you can come.<br><br>Your friend,<br>Kevin"}},
+ read:[
+  {part:1,q:"Lisa (　　) her umbrella on the train, so she went to the station's lost-and-found office.",opts:["left","kept","raised","borrowed"],ans:0,jp:"遺失物取扱所に行った → 傘を置き忘れた（left）。"},
+  {part:1,q:"A: Did you hear that Mr. Kato will (　　) next month?<br>B: Yes. He has been teaching at this school for 30 years.",opts:["explain","retire","invite","decide"],ans:1,jp:"30年教えてきた → retire（退職する）。"},
+  {part:1,q:"The concert was (　　) because of the typhoon, so we got our money back.",opts:["celebrated","collected","canceled","created"],ans:2,jp:"台風で返金 → canceled（中止された）。"},
+  {part:1,q:"Jim walked so fast that I couldn't keep (　　) with him.",opts:["off","up","out","down"],ans:1,jp:"keep up with ～「～についていく」。"},
+  {part:2,q:"<i>A:</i> Excuse me. Is there a bank near here?<br><i>B:</i> Yes, (　　) It's next to the post office.<br><i>A:</i> Thank you.",opts:["go straight for two blocks.","I'll take it.","it closes at noon.","I don't have any money."],ans:0,jp:"道案内の流れ。"},
+  {part:2,q:"<i>A:</i> Mom, I'm going to Kate's house to study.<br><i>B:</i> OK. (　　)<br><i>A:</i> I'll be back by six.",opts:["Who is Kate?","What time will you come home?","How did you get there?","Where is your notebook?"],ans:1,jp:"「6時までに戻る」→ 帰宅時間を聞いている。"},
+  {part:3,pas:"nami",blank:7,opts:["sold it to her friend","asked him for help","bought a new one","put it in a box"],ans:1,jp:"直後に He taught her ～ とあるので、祖父に助けを求めた。"},
+  {part:3,pas:"nami",blank:8,opts:["was lost on the way","was too dark","won second prize","was sold at a shop"],ans:2,jp:"とても喜んだ → 2等賞を取った。"},
+  {part:4,pas:"mail",q:"What is the city hoping for this year?",opts:["To build a new beach house.","To get more volunteers than last year.","To finish cleaning in one hour.","To sell gloves and bags."],ans:1,jp:"the city is hoping to get even more people."},
+  {part:4,pas:"mail",q:"What should volunteers bring to the event?",opts:["Gloves.","Trash bags.","Something to drink.","Lunch for everyone."],ans:2,jp:"we should bring something to drink"},
+  {part:4,pas:"mail",q:"Kevin's sister wants to",opts:["teach them how plastic trash affects sea animals.","take pictures of the volunteers.","meet Daichi at the station.","study at a university near the beach."],ans:0,jp:"she wants to show us how plastic trash hurts sea animals."}],
+ writeDesc:"ライティングはEメール（40〜50語）と英作文（50〜60語）の2問です。",
+ write:[
+  {label:"Eメール",min:40,max:50,
+   instr:"あなたは、外国人の知り合い（Sam）から以下のEメールを受け取りました。Eメールを読み、それに対する返信メールを英文で書きなさい。あなたが書く返信メールの中で、Samのメール文中の下線部について、あなたがより理解を深めるために、下線部の特徴を問う具体的な質問を2つしなさい。また、Samからの質問にも答えなさい。語数の目安は40語～50語です。解答欄の外に書かれたものは採点されません。",
+   prompt:"Hi!<br>Guess what? My family <span class=\"u\">got a new pet</span> last week. My little brother wanted one for a long time, so he is very happy. It is really cute, but taking care of it is a lot of work. By the way, do you think it is good for children to have pets?<br>Your friend,<br>Sam",
+   plain:"Hi! Guess what? My family got a new pet (underlined) last week. My little brother wanted one for a long time, so he is very happy. It is really cute, but taking care of it is a lot of work. By the way, do you think it is good for children to have pets? Your friend, Sam",
+   before:"Hi, Sam!<br>Thank you for your e-mail.",after:"Best wishes,",
+   model:"That's great news! What kind of pet did your family get? And how big is it? I think it is good for children to have pets. They can learn how to take care of living things, and they can become more responsible."},
+  {label:"英作文",min:50,max:60,
+   instr:"あなたは、外国人の知り合いから以下のQUESTIONをされました。QUESTIONについて、あなたの意見とその理由を2つ英文で書きなさい。語数の目安は50語～60語です。解答欄の外に書かれたものは採点されません。解答がQUESTIONに対応していないと判断された場合は、0点と採点されることがあります。",
+   prompt:"<b>QUESTION</b><br>Do you think it is good for students to use smartphones at school?",plain:"QUESTION: Do you think it is good for students to use smartphones at school?",
+   model:"I think it is good for students to use smartphones at school. First, they can look up information quickly when they study. For example, they can check the meaning of difficult words. Second, students can contact their parents easily if there is an emergency. For these reasons, I think smartphones are useful at school."}],
+ rubric:"Eメール問題の観点: 内容(下線部について特徴を問う具体的な質問を2つし、相手の質問に答えているか)・語彙・文法 各0-4点。\n英作文(意見論述・理由2つ)の観点: 内容・構成・語彙・文法 各0-4点。"
+},
+
+"2":{label:"2級",sub:"高校卒業程度",rwFull:85,rwShort:35,aloud:40,audience:"日本人の高校生",
+ speak:{title:"Working from Home",
+  passage:"Nowadays, more and more companies let their workers work from home. Workers do not need to spend time traveling to the office. Some companies use online meeting systems, and by doing so they let workers communicate easily with each other. However, some workers feel lonely because they cannot talk with their co-workers face-to-face.",
+  art:()=>`<div class="opening">Your story should begin with this sentence:<br><b>One day, Yuko was talking with her father in the living room.</b></div>${panels2()}`,
+  intro:"No.2では3コマのイラストを見て、20秒の準備のあと、カードの最初の文から始めて状況を説明します。No.3・No.4はあなたの意見を答えます。",
+  qs:[
+   {n:1,card:"front",ans:20,q:"According to the passage, how do some companies let workers communicate easily with each other?",a:"By using online meeting systems."},
+   {n:2,card:"front",prep:20,ans:60,lines:["Now, please look at the pictures and describe the situation.","You have twenty seconds to prepare.","Your story should begin with the sentence on the card."],go:"Please begin.",q:"Please look at the pictures and describe the situation. Your story should begin with the sentence on the card.",
+    a:"One day, Yuko was talking with her father in the living room. She said to him, \"I want to make a cake for Mom's birthday.\" That afternoon, they went to a supermarket. Her father put some eggs in the basket, and Yuko found some strawberries. That evening, Yuko's mother saw the cake on the table. She was very happy."},
+   {n:3,card:"back",ans:30,pre:["Now, please turn the card over."],q:"Some people say that high school students should do volunteer work. What do you think about that?",a:"I agree. Volunteer work gives students a chance to help people in their community. They can also learn things that they cannot learn at school."},
+   {n:4,card:"back",ans:30,q:"Today, many people read the news on their smartphones. Do you think newspapers will disappear in the future?",follow:"Yes. → Why?　／　No. → Why not?",a:"No. Many older people still like reading newspapers. Also, newspapers give detailed information about local news."}],
+  tip:"No.2は「That afternoon」「That evening」などコマ上の言葉を使い、各コマ2文程度で過去形で話すのがコツです。"},
+ listenIntro:["第1部：対話と質問を聞き、答えを画面の4つの選択肢から選びます。","第2部：英文と質問を聞き、答えを画面の4つの選択肢から選びます。"],
+ ldir:{1:"対話を聞き、その質問に対して最も適切なものを1, 2, 3, 4の中から一つ選びなさい。",2:"英文を聞き、その質問に対して最も適切なものを1, 2, 3, 4の中から一つ選びなさい。"},
+ listen:[
+  {part:1,lines:[["W","Hi, Mark. You look tired."],["M","I stayed up late finishing a presentation for today's meeting."],["W","Oh, wasn't the meeting moved to next Monday?"],["M","Really? Nobody told me. Well, at least I'm ready now."]],q:"What do we learn about the man?",opts:["He missed an important meeting.","He didn't know the meeting date had changed.","He forgot to make his presentation.","He will give a presentation today."],ans:1,jp:"会議が来週に変更されたことを知らなかった（Nobody told me.）。"},
+  {part:1,lines:[["M","Excuse me. I bought this jacket here yesterday, but it's too small."],["W","I'm sorry. Would you like a larger size or your money back?"],["M","I'd like a larger one, in the same color."],["W","Let me check. Yes, we have one in black in the back."]],q:"What does the man want to do?",opts:["Get his money back.","Buy a different jacket.","Exchange the jacket for a bigger one.","Find a jacket in another color."],ans:2,jp:"同じ色の大きいサイズに交換したい。"},
+  {part:1,lines:[["W","Dad, can you drive me to the station tomorrow morning?"],["M","Sorry, I have to leave early for work. Why don't you take the bus?"],["W","The first bus is too late. I need to be there by six thirty."],["M","Then ask your mom. She doesn't work tomorrow."]],q:"What will the girl probably do?",opts:["Take the first bus.","Ask her mother for a ride.","Walk to the station.","Leave the house after work."],ans:1,jp:"父に「お母さんに頼みなさい」と言われている。"},
+  {part:2,lines:[["N","Some kinds of birds travel thousands of kilometers every year. Scientists used to think that birds only used the sun to find their way. However, recent studies show that birds can also sense the earth's magnetic field. This helps them travel even on cloudy days."]],q:"What do recent studies show about birds?",opts:["They travel only on sunny days.","They can feel the earth's magnetic field.","They follow other kinds of birds.","They remember the shape of mountains."],ans:1,jp:"birds can also sense the earth's magnetic field"},
+  {part:2,lines:[["N","Kenta works at a hotel in Kyoto. Many guests from other countries stay there, so he wanted to improve his English. He started watching English news every morning before work. Now, he can explain the city's history to guests more easily."]],q:"What did Kenta do to improve his English?",opts:["He studied abroad.","He took lessons at work.","He watched English news every morning.","He talked with guests every night."],ans:2,jp:"He started watching English news every morning"},
+  {part:2,lines:[["N","Attention, passengers. Because of heavy snow, the 3:15 train to Sendai has been canceled. Passengers going to Sendai can take the 3:40 express train at no extra charge. Please go to platform 5."]],q:"What should passengers going to Sendai do?",opts:["Wait for the snow to stop.","Buy a new ticket.","Take the 3:40 train from platform 5.","Take a bus to Sendai."],ans:2,jp:"3時40分の特急に追加料金なしで乗れる。5番線へ。"}],
+ rdir:{1:"次の(　　)に入れるのに最も適切なものを1, 2, 3, 4の中から一つ選びなさい。",2:"次の英文を読み、その文意にそって(　　)に入れるのに最も適切なものを1, 2, 3, 4の中から一つ選びなさい。",3:"次の英文の内容に関して、質問に対する答えとして最も適切なもの、または文を完成させるのに最も適切なものを1, 2, 3, 4の中から一つ選びなさい。"},
+ pas:{
+  air:{title:"Cleaner Air in Cities",body:"In many large cities, air pollution has been a serious problem for years. Cars and factories produce gases that can make it hard for people to breathe. To solve this problem, some cities have started <span class=\"blank\">(5)</span>. In some European cities, for example, cars are not allowed on certain streets on weekends, and people walk or ride bicycles instead.<br><br>These changes have had good results. After the streets were closed to cars, the amount of harmful gases in the air dropped. However, not everyone is happy. Some shop owners say that fewer customers visit their stores because they cannot come by car. <span class=\"blank\">(6)</span>, city governments are trying to find a balance between clean air and business."},
+  sleep:{title:"Teenagers and Sleep",body:"Many teenagers today do not get enough sleep. Experts say that people between 13 and 18 years old need about eight to ten hours of sleep each night. However, a survey in one country found that more than half of high school students sleep less than seven hours.<br><br>One reason is the use of smartphones at night. The light from smartphone screens can tell the brain that it is still daytime, so it becomes harder to fall asleep. Also, many students use their phones to chat with friends late at night.<br><br>Some schools have tried a new idea. They start classes later in the morning so that students can sleep longer. At one school that tried this, students' test scores improved, and fewer students were late for school. Teachers also said that students were more active in class. Although later start times can cause problems for parents who need to go to work early, many experts believe that the idea is worth trying."}},
+ read:[
+  {part:1,q:"The company decided to (　　) the release of its new product until next spring because of problems with the design.",opts:["persuade","postpone","permit","preserve"],ans:1,jp:"設計の問題で来春まで → postpone（延期する）。"},
+  {part:1,q:"Mr. Wilson is a very (　　) driver. He has never had an accident in 30 years.",opts:["cautious","generous","curious","nervous"],ans:0,jp:"30年無事故 → cautious（慎重な）。"},
+  {part:1,q:"Because of the strong wind, the outdoor event was held in the gym (　　).",opts:["at least","in advance","instead","after all"],ans:2,jp:"屋外の代わりに体育館で → instead。"},
+  {part:1,q:"Before the meeting, Lisa went (　　) her notes to make sure she had all the information.",opts:["off","over","up","out"],ans:1,jp:"go over ～「～を見直す」。"},
+  {part:2,pas:"air",blank:5,opts:["building more parking lots","limiting the use of cars","making roads wider","lowering the price of gas"],ans:1,jp:"直後に「車が通れない通りがある」→ 車の利用を制限。"},
+  {part:2,pas:"air",blank:6,opts:["For example","In the past","For this reason","By mistake"],ans:2,jp:"店の客が減るという問題を受けて → For this reason（このため）。"},
+  {part:3,pas:"sleep",q:"According to the passage, why can using a smartphone at night make it hard to sleep?",opts:["Students need to study on their phones.","The screen's light makes the brain think it is still day.","Phones make loud sounds at night.","Students forget to charge their phones."],ans:1,jp:"The light from smartphone screens can tell the brain that it is still daytime"},
+  {part:3,pas:"sleep",q:"What happened at the school that started classes later?",opts:["Students' test scores went up.","Parents got to work earlier.","More students were late.","Teachers had to work longer."],ans:0,jp:"students' test scores improved"},
+  {part:3,pas:"sleep",q:"Which of the following statements is true?",opts:["Experts say teenagers need less than seven hours of sleep.","All schools have started classes later.","Later start times can be difficult for some parents.","Smartphones help students fall asleep."],ans:2,jp:"later start times can cause problems for parents who need to go to work early"}],
+ writeDesc:"ライティングは要約（45〜55語）と英作文（80〜100語）の2問です。",
+ write:[
+  {label:"要約",min:45,max:55,
+   instr:"以下の英文を読んで、その内容を英語で要約し、解答欄に記入しなさい。語数の目安は45語～55語です。解答欄の外に書かれたものは採点されません。解答が英文の要約になっていないと判断された場合は、0点と採点されることがあります。英文をよく読んでから答えてください。",
+   prompt:"Many people in Japan have started using self-checkout machines at supermarkets. With these machines, customers scan the items they buy and pay by themselves without the help of a cashier.<br><br>Self-checkout machines have some advantages for stores. Stores do not need to hire as many workers, so they can save money. Also, customers who buy only a few items can finish shopping quickly because they do not need to wait in long lines.<br><br>However, some customers find self-checkout machines difficult to use. For example, many elderly people are not used to using machines like these. In addition, some customers make mistakes when they scan items, and stores sometimes lose money as a result.",
+   plain:"Many people in Japan have started using self-checkout machines at supermarkets. With these machines, customers scan the items they buy and pay by themselves without the help of a cashier. Self-checkout machines have some advantages for stores. Stores do not need to hire as many workers, so they can save money. Also, customers who buy only a few items can finish shopping quickly because they do not need to wait in long lines. However, some customers find self-checkout machines difficult to use. For example, many elderly people are not used to using machines like these. In addition, some customers make mistakes when they scan items, and stores sometimes lose money as a result.",
+   model:"Self-checkout machines, which let customers pay without a cashier, are becoming common in Japanese supermarkets. They help stores save money on workers and let customers with few items shop quickly. However, some people, especially elderly people, find them hard to use, and scanning mistakes can cause stores to lose money."},
+  {label:"英作文",min:80,max:100,
+   instr:"以下のTOPICについて、あなたの意見とその理由を2つ書きなさい。POINTSは理由を書く際の参考となる観点を示したものです。ただし、これら以外の観点から理由を書いてもかまいません。語数の目安は80語～100語です。解答欄の外に書かれたものは採点されません。解答がTOPICに示された問いの答えになっていない場合や、TOPICからずれていると判断された場合は、0点と採点されることがあります。",
+   prompt:"<b>TOPIC</b><br>Some people say that more people will live in big cities in the future. Do you think this will happen?<div class=\"points\"><b>POINTS</b><br>● Jobs　● Convenience　● Cost of living</div>",
+   plain:"TOPIC: Some people say that more people will live in big cities in the future. Do you think this will happen? POINTS: Jobs / Convenience / Cost of living",
+   model:"I think more people will live in big cities in the future. I have two reasons. First, there are many more jobs in big cities than in the countryside. Many young people move to cities such as Tokyo and Osaka to find good jobs. Second, life in big cities is very convenient. People can easily use trains and buses, and there are many hospitals and stores near their homes. For these two reasons, I believe more people will choose to live in big cities."}],
+ rubric:"要約問題の観点: 内容(本文の要点を過不足なく含み、自分の意見を加えていないか)・構成・語彙(本文の表現を言い換えているか)・文法 各0-4点。\n英作文(意見論述・理由2つ)の観点: 内容・構成・語彙・文法 各0-4点。"
+}};
+
+/* ===================== 状態 ===================== */
+const TIMES={"3":{r:[12,40],w:[13,25]},"p2":{r:[15,50],w:[15,30]},"2":{r:[18,50],w:[20,35]}};
+const SCOPES=[["all","4技能すべて","本番と同じ流れ"],["speak","スピーキングだけ","面接形式"],["listen","リスニングだけ","音声は各2回"],["read","リーディングだけ","時間を計って解く"],["write","ライティングだけ","キーボード入力"]];
+const inS=k=>S.scope==="all"||S.scope===k;
+function secs(){
+  const all=[["speak","スピーキング"],["listen","リスニング"],["rw",S.scope==="read"?"リーディング":S.scope==="write"?"ライティング":"リーディング・ライティング"]];
+  if(S.scope==="all")return all;
+  const k=S.scope==="read"||S.scope==="write"?"rw":S.scope;
+  return all.filter(x=>x[0]===k);
+}
+const firstSec=()=>S.scope==="all"?"speak":(S.scope==="read"||S.scope==="write")?"rw":S.scope;
+const S={grade:"3",scope:"all",screen:"home",sec:null,i:0,run:0,la:{},ra:{},rf:{},wf:{},wa:["",""],done:{},started:{},self:{},rep:{},name:"",mode:"short",vol:1,ov:false,cf:false,ai:null,end:0,paused:false,pauseAt:0,aborted:false};
+const G=()=>GRADES[S.grade];
+const $=s=>document.querySelector(s);
+const main=$("#main");
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const wcount=t=>t.trim().split(/\s+/).filter(Boolean).length;
+const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+const minsFor=full=>{const t=TIMES[S.grade];if(S.scope==="read")return t.r[full?1:0];if(S.scope==="write")return t.w[full?1:0];return full?G().rwFull:G().rwShort};
+const rwMin=()=>minsFor(S.mode==="full");
+const RW=()=>[...(S.scope!=="write"?G().read.map((_,k)=>({t:"r",k})):[]),...(S.scope!=="read"?G().write.map((_,k)=>({t:"w",k})):[])];
+
+/* ===================== タイマー ===================== */
+let tick=null;
+function startTimer(secs,expire,each){
+  stopTimer();const end=Date.now()+secs*1000;let fired=false;
+  const f=()=>{const left=Math.max(0,Math.ceil((end-Date.now())/1000));each&&each(left,secs);
+    if(left<=0&&!fired){fired=true;stopTimer();expire&&expire()}};
+  f();tick=setInterval(f,200);
+}
+function stopTimer(){clearInterval(tick);tick=null}
+function head(left,label){
+  const b=$("#tbox");
+  if(left==null){b.hidden=true;return}
+  b.hidden=false;$("#tlabel").textContent=label||"残り時間";$("#tval").textContent=fmt(left);
+  b.classList.toggle("warn",label==="残り時間"&&left<=300);
+}
+
+/* ===================== 音声 ===================== */
+const TTS="speechSynthesis" in window&&typeof SpeechSynthesisUtterance!=="undefined";
+let VOICES={};
+function loadVoices(){
+  if(!TTS)return;
+  const vs=speechSynthesis.getVoices().filter(v=>/^en[-_]?(US|GB)?/i.test(v.lang));if(!vs.length)return;
+  const fem=vs.find(v=>/female|samantha|zira|aria|jenny|karen|serena|google us english/i.test(v.name));
+  const mal=vs.find(v=>/\bmale|daniel|david|alex|fred|guy|uk english male/i.test(v.name)&&v!==fem);
+  VOICES={W:fem||vs[0],M:mal||vs[1]||vs[0],N:vs.find(v=>/en-US/i.test(v.lang))||vs[0]};
+}
+if(TTS){loadVoices();speechSynthesis.onvoiceschanged=loadVoices}
+function say(text,who="N"){
+  return new Promise(res=>{
+    if(!TTS){setTimeout(res,700);return}
+    let done=false;const fin=()=>{if(!done){done=true;res()}};
+    const u=new SpeechSynthesisUtterance(text);u.lang="en-US";u.rate=0.88;u.volume=S.vol;
+    const v=VOICES[who];if(v)u.voice=v;
+    if(VOICES.W===VOICES.M)u.pitch=who==="W"?1.25:who==="M"?0.8:1;
+    u.onend=fin;u.onerror=fin;
+    try{speechSynthesis.speak(u)}catch(e){fin()}
+    setTimeout(fin,text.length*130+5000);
+  });
+}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+function hush(){S.run++;if(TTS)try{speechSynthesis.cancel()}catch(e){}stopTimer()}
+
+/* ===================== 枠 ===================== */
+function chrome(){
+  $("#lv").textContent=G().label;
+  $("#rail").innerHTML=secs().map(([k,l])=>`<span class="${S.sec===k?"on":S.done[k]?"done":""}">${l}</span>`).join("")+
+    ((S.screen==="speak"||S.screen==="listen"||S.screen==="home")?`<label class="vol" for="vol">音量<input type="range" id="vol" min="0" max="1" step="0.1" value="${S.vol}"></label>`:"");
+  const v=$("#vol");if(v)v.oninput=e=>S.vol=+e.target.value;
+  $("#who").textContent=S.name?`受験者：${S.name}`:"";
+  $("#secname").textContent=S.sec?secs().find(s=>s[0]===S.sec)[1]+"テスト":"英検S-CBT 模擬試験";
+  $("#abortBtn").hidden=!S.sec;
+}
+function tool(html){
+  const t=$("#tool");if(!html){t.hidden=true;$("#mainwrap").classList.remove("hasfoot");return}
+  t.hidden=false;$("#toolin").innerHTML=html;$("#mainwrap").classList.add("hasfoot");
+}
+function go(screen,extra={}){
+  hush();Object.assign(S,{screen,cf:false,ov:false},extra);
+  if(screen==="speak"||screen==="listen"||screen==="rw")S.started[screen]=true;
+  render();window.scrollTo(0,0);
+}
+function render(){chrome();({home,intro,speak,listen,rw,result})[S.screen]()}
+function resetAll(){Object.assign(S,{la:{},ra:{},rf:{},wf:{},wa:["",""],done:{},started:{},self:{},rep:{},ai:null,end:0,aborted:false,paused:false})}
+
+/* ===================== 一時停止・中止 ===================== */
+function pause(){
+  if(S.paused||!S.sec)return;
+  S.paused=true;S.pauseAt=Date.now();hush();
+  const live=S.screen==="speak"||S.screen==="listen";
+  $("#dlgP").innerHTML=(S.screen==="rw"?"制限時間は止まっています。":"")+
+    (live?"再開すると、いまの問題を最初から放送し直します。":"")+
+    "中止する場合は、ここまでの結果を見るか、トップに戻るかを選んでください。";
+  $("#ovl").hidden=false;$("#dResume").focus();
+}
+function resume(){
+  if(!S.paused)return;
+  if(S.screen==="rw"&&S.end)S.end+=Date.now()-S.pauseAt;
+  S.paused=false;$("#ovl").hidden=true;render();
+}
+$("#abortBtn").onclick=pause;
+$("#dResume").onclick=resume;
+$("#dResult").onclick=()=>{S.paused=false;$("#ovl").hidden=true;S.aborted=true;go("result")};
+$("#dHome").onclick=()=>{S.paused=false;$("#ovl").hidden=true;resetAll();go("home")};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.paused)resume()});
+
+/* ===================== ホーム ===================== */
+function home(){
+  S.sec=null;head(null);tool(null);chrome();
+  const g=G();
+  main.innerHTML=`<section class="panel stack">
+    <h1>英検S-CBT 模擬試験</h1>
+    <p>本番と同じ画面の進み方で、4技能を通して受験したり、技能ごとに練習したりできます。問題はオリジナルで、問題数は本番より少ないミニ版です。</p>
+    <div class="stack" style="gap:6px"><span class="muted" style="font-size:13px" id="glab">受験する級</span>
+      <div class="grades" role="radiogroup" aria-labelledby="glab">${["3","p2","2"].map(k=>[k,GRADES[k]]).map(([k,v])=>`<button class="gbtn" role="radio" aria-checked="${S.grade===k}" data-g="${k}"><b>${v.label}</b><span>${v.sub}</span></button>`).join("")}</div></div>
+    <div class="stack" style="gap:6px"><span class="muted" style="font-size:13px" id="slab">受験する範囲</span>
+      <div class="scopes" role="radiogroup" aria-labelledby="slab">${SCOPES.map(([k,l,d])=>`<button class="gbtn sc" role="radio" aria-checked="${S.scope===k}" data-s="${k}"><b>${l}</b><span>${d}</span></button>`).join("")}</div></div>
+    <div class="flow" ${S.scope==="all"?"":"hidden"}>
+      <div><i>1</i><b>スピーキング</b><span>画面の面接委員の指示で進行。準備時間のあと録音が自動で始まります</span></div>
+      <div><i>2</i><b>リスニング</b><span>音声は各2回。解答時間が終わると自動で次の問題へ。戻れません</span></div>
+      <div><i>3</i><b>リーディング・ライティング</b><span>2つで1つの制限時間。問題一覧から自由に行き来できます</span></div>
+    </div>
+    <div class="grid2">
+      <label class="f" for="nm">受験者名（任意）<input type="text" id="nm" value="${esc(S.name)}" autocomplete="off"></label>
+      ${S.scope==="all"||S.scope==="read"||S.scope==="write"?`<label class="f" for="md">${S.scope==="read"?"リーディング":S.scope==="write"?"ライティング":"リーディング・ライティング"}の制限時間
+        <select id="md"><option value="short"${S.mode==="short"?" selected":""}>短縮：${minsFor(false)}分（ミニ版の問題数に合わせた時間）</option><option value="full"${S.mode==="full"?" selected":""}>${S.scope==="all"?"本番と同じ":"本番の時間配分の目安"}：${minsFor(true)}分</option></select></label>`:""}
+    </div>
+    <div class="stack" style="gap:8px" ${S.scope==="read"||S.scope==="write"?"hidden":""}><b>音量の確認</b>
+      <div class="row"><button class="btn" id="check">テスト音声を再生</button><span class="muted" id="checkmsg" style="font-size:13px">上のバーの「音量」で調整できます</span></div></div>
+    ${TTS?"":`<p class="note">この端末では英語の読み上げが使えないため、音声の代わりに「スクリプトを表示」ボタンが出ます。</p>`}
+    <p class="note" ${S.scope==="all"||S.scope==="speak"?"":"hidden"}>本番のスピーキングはヘッドセットのマイクで録音されます。この模擬では録音しないので、マイクが赤くなっている間に声に出して答える練習をしてください。試験中は右上の「中止」でいつでも一時停止・中止できます。</p>
+    <div class="row"><button class="btn primary" id="start">${g.label}${S.scope==="all"?"の試験":"・"+SCOPES.find(x=>x[0]===S.scope)[1]}を開始する</button></div>
+  </section>`;
+  main.querySelectorAll(".gbtn[data-g]").forEach(b=>b.onclick=()=>{S.grade=b.dataset.g;home()});
+  main.querySelectorAll(".gbtn[data-s]").forEach(b=>b.onclick=()=>{S.scope=b.dataset.s;home()});
+  $("#nm").oninput=e=>{S.name=e.target.value;chrome()};
+  if($("#md"))$("#md").onchange=e=>S.mode=e.target.value;
+  $("#check").onclick=async()=>{$("#checkmsg").textContent="再生中…";await say("This is a sound check. Can you hear me clearly?","N");$("#checkmsg").textContent="聞こえにくい場合は音量を調整してください"};
+  $("#start").onclick=()=>{resetAll();go("intro",{sec:firstSec()})};
+}
+
+/* ===================== 説明画面 ===================== */
+function introLines(){
+  const g=G();
+  if(S.sec==="speak")return["画面の面接委員が英語で指示や質問をします。",`問題カードのパッセージを20秒間黙読したあと、音読します。続いて質問No.1〜No.${g.speak.qs.length}に答えます。`,g.speak.intro,"マイクのアイコンが<b>赤色</b>になると録音が始まります。赤くなる前に話し始めないでください。","解答時間が終わると自動で次に進みます。質問を聞き逃したときは「もう一度聞く」を押せますが、評価に影響する場合があります。"];
+  if(S.sec==="listen")return[...g.listenIntro,"音声はすべて2回放送されます。解答時間が終わると自動で次の問題に進み、前の問題には戻れません。"];
+  const both=S.scope==="all";
+  return[`制限時間は<b>${both?"リーディングとライティング合わせて":""}${rwMin()}分</b>です。${both?"時間配分は自由です。":""}`,
+    ...(S.scope!=="write"?[`リーディングは${g.read.length}問です。`]:[]),
+    ...(S.scope!=="read"?[g.writeDesc]:[]),
+    "「問題一覧」から、どの問題にも移動できます。後で確認したい問題は「見直し」を押すと印がつきます。",
+    ...(S.scope!=="read"?["ライティングはキーボードで入力します。スペルチェック機能はありません。"]:[]),
+    "すべて終わったら、問題一覧の「解答を終了する」を押してください。時間になると自動で終了します。"];
+}
+function intro(){
+  head(null);
+  const t=secs().find(s=>s[0]===S.sec)[1]+"テスト";
+  main.innerHTML=`<section class="panel stack"><h1>${t}</h1>
+    <ol style="margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:6px">${introLines().map(l=>`<li>${l}</li>`).join("")}</ol></section>`;
+  tool(`<span class="msg">準備ができたら「開始」を押してください</span><div class="grp"><button class="btn primary" id="go">開始</button></div>`);
+  $("#go").onclick=()=>{if(S.sec==="rw")S.end=Date.now()+rwMin()*60000;go(S.sec,{i:0})};
+  $("#go").focus();
+}
+
+/* ===================== スピーキング ===================== */
+const MIC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+function interviewer(){
+  return `<svg viewBox="0 0 300 225" aria-hidden="true">
+    <rect width="300" height="225" fill="#d9dee6"/><rect y="150" width="300" height="75" fill="#b9a68a"/>
+    <rect x="30" y="30" width="70" height="90" fill="#c9d3df" stroke="#aab4c2"/>
+    <path d="M95 225 q0 -62 55 -66 q55 4 55 66z" fill="#34495e"/>
+    <path d="M136 160 l14 22 l14 -22z" fill="#f4f4f4"/>
+    <rect x="140" y="140" width="20" height="22" fill="#e8bf9c"/>
+    <ellipse cx="150" cy="112" rx="30" ry="36" fill="#f0c9a6"/>
+    <path d="M120 108 q2 -42 30 -42 q30 0 30 42 q-4 -24 -30 -26 q-24 2 -30 26z" fill="#3a2e28"/>
+    <circle cx="139" cy="110" r="3" fill="#2b2b2b"/><circle cx="161" cy="110" r="3" fill="#2b2b2b"/>
+    <ellipse class="mouth" cx="150" cy="128" rx="7" ry="2.5" fill="#9b4a43"/>
+    <rect x="200" y="182" width="60" height="6" fill="#8d7a60"/></svg>`;
+}
+function steps(){
+  const g=G();
+  return[
+    {lab:"ウォームアップ",card:"none",lines:["Hello.","May I have your name, please?"],ans:8,warm:1},
+    {lab:"ウォームアップ",card:"none",lines:["How are you today?"],ans:6,warm:1},
+    {lab:"黙読",card:"front",lines:["Let's start the test.","Please look at the card.","Please read the passage silently for twenty seconds."],prep:20},
+    {lab:"音読",card:"front",lines:["All right. Please read the passage aloud."],ans:g.aloud},
+    ...g.speak.qs.map((q,k)=>({lab:`No. ${q.n}`,card:q.card,lines:q.lines||[...(q.pre||[]),q.q],prep:q.prep,ans:q.ans,go:q.go,qk:k,follow:q.follow}))];
+}
+function cardHTML(kind){
+  const sp=G().speak;
+  if(kind==="none")return `<div class="qcard"><div class="back">問題カードはこのあと表示されます</div></div>`;
+  if(kind==="back")return `<div class="qcard"><div class="back">（カードは裏返しです）<br>あなた自身の考えを答えてください</div></div>`;
+  return `<div class="qcard"><h3>${sp.title}</h3><p class="en">${sp.passage}</p>${sp.art()}</div>`;
+}
+function speak(){
+  const SS=steps();const st=SS[S.i];const run=++S.run;head(null);
+  main.innerHTML=`<div>
+    <div class="qbar"><b>${st.lab}</b><span class="qn">${S.i+1} / ${SS.length}</span></div>
+    <div class="qframe"><div class="spk">
+      <div class="stack" style="gap:10px">
+        <div class="video" id="vid">${interviewer()}<div class="cap" id="cap" hidden></div></div>
+        <div class="recbox"><div class="mic" id="mic">${MIC}</div><div><div class="lbl" id="lbl">待機中</div><div class="muted" style="font-size:12px" id="sub">面接委員の話を聞いてください</div></div><div class="cd" id="cd"></div></div>
+        <div class="bar-m" id="bm"><i id="bmi"></i></div>
+        ${st.follow?`<p class="note" id="fol" hidden>解答のあと、面接委員から続けて質問されます：${esc(st.follow)}</p>`:""}
+      </div>
+      <div>${cardHTML(st.card)}</div>
+    </div></div></div>`;
+  const repN=S.rep[S.i]||0;
+  tool(`<span class="msg">${st.warm?"ウォームアップは採点されません":"録音のやり直しはできません"}</span>
+    <div class="grp">${TTS?"":`<button class="btn" id="scr">スクリプトを表示</button>`}
+    ${st.qk!=null?`<button class="btn warn" id="rep">もう一度聞く${repN?`（${repN}回使用）`:""}</button>`:""}
+    <button class="btn primary" id="nx" disabled>次へ</button></div>`);
+  const mic=$("#mic"),lb=$("#lbl"),sub=$("#sub"),cd=$("#cd"),bm=$("#bm"),bmi=$("#bmi"),vid=$("#vid"),cap=$("#cap"),nx=$("#nx");
+  const next=()=>{if(run!==S.run)return;if(S.i<SS.length-1)go("speak",{i:S.i+1});else{S.done.speak=true;S.scope==="all"?go("intro",{sec:"listen"}):go("result")}};
+  nx.onclick=next;
+  if($("#rep"))$("#rep").onclick=()=>{S.rep[S.i]=(S.rep[S.i]||0)+1;go("speak",{i:S.i})};
+  if($("#scr"))$("#scr").onclick=()=>{cap.hidden=false;cap.textContent=st.lines.join(" ")};
+  const phase=(secs,rec)=>new Promise(res=>{
+    mic.classList.toggle("on",rec);bm.classList.toggle("on",rec);lb.classList.toggle("on",rec);
+    lb.textContent=rec?"録音中":"準備時間";sub.textContent=rec?"英語で答えてください":"カードを見てください";
+    nx.disabled=!rec;
+    startTimer(secs,res,(l,t)=>{cd.textContent=l;bmi.style.width=((t-l)/t*100)+"%";head(l,rec?"解答時間":"準備時間")});
+  });
+  (async()=>{
+    await wait(400);if(run!==S.run)return;
+    vid.classList.add("talking");lb.textContent="再生中";sub.textContent="面接委員の話を聞いてください";
+    for(const ln of st.lines){await say(ln,"M");if(run!==S.run)return;await wait(250)}
+    vid.classList.remove("talking");
+    if(st.prep){await phase(st.prep,false);if(run!==S.run)return;if(!st.ans){next();return}}
+    if(st.go){vid.classList.add("talking");mic.classList.remove("on");lb.textContent="再生中";await say(st.go,"M");if(run!==S.run)return;vid.classList.remove("talking")}
+    if($("#fol"))$("#fol").hidden=false;
+    await phase(st.ans,true);if(run!==S.run)return;
+    mic.classList.remove("on");next();
+  })();
+}
+
+/* ===================== リスニング ===================== */
+const SPK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>';
+function listen(){
+  const L=G().listen,it=L[S.i];const run=++S.run;head(null);
+  const sel=S.la[S.i];
+  main.innerHTML=`<div>
+    <div class="qbar"><b>第${it.part}部</b><span class="qn">No. ${S.i+1}　（${S.i+1} / ${L.length}）</span></div>
+    <div class="qframe">
+      <p class="direc">${G().ldir[it.part]}</p>
+      <div class="lstage"><div class="spk-ic" id="ic">${SPK}</div><span class="lbl" id="lbl">放送を待っています</span><div class="bar-m"><i id="bmi"></i></div></div>
+      <div id="scrbox" class="script" hidden></div>
+      <div class="qstem"><span class="no">No. ${S.i+1}</span>${it.read?`<span class="muted" style="font-size:14px;line-height:1.8">選択肢は放送されます。</span>`:""}</div>
+      <div class="opts ${it.read?"inline":""}" role="radiogroup" aria-label="解答">
+        ${it.opts.map((o,k)=>`<button class="opt" role="radio" aria-checked="${sel===k}" data-k="${k}"><span class="rd"></span><span class="k">${k+1}</span>${it.read?"":`<span class="t">${esc(o)}</span>`}</button>`).join("")}
+      </div>
+    </div></div>`;
+  tool(`<span class="msg">解答時間が終わると自動で次の問題に進みます。前の問題には戻れません。</span>
+    <div class="grp">${TTS?"":`<button class="btn" id="scr">スクリプトを表示</button>`}<button class="btn primary" id="nx" disabled>次へ</button></div>`);
+  main.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{S.la[S.i]=+b.dataset.k;main.querySelectorAll(".opt").forEach(x=>x.setAttribute("aria-checked",x===b))});
+  const next=()=>{if(run!==S.run)return;if(S.i<L.length-1)go("listen",{i:S.i+1});else{S.done.listen=true;S.scope==="all"?go("intro",{sec:"rw"}):go("result")}};
+  $("#nx").onclick=next;
+  if($("#scr"))$("#scr").onclick=()=>{const b=$("#scrbox");b.hidden=false;b.innerHTML=scriptHTML(it)};
+  const ic=$("#ic"),lb=$("#lbl"),bmi=$("#bmi");
+  (async()=>{
+    await wait(500);if(run!==S.run)return;
+    for(let r=1;r<=2;r++){
+      ic.classList.add("on");lb.textContent=`放送中（${r}回目）`;bmi.style.width=(r===1?25:75)+"%";
+      for(const [w,t] of it.lines){await say(t,w);if(run!==S.run)return;await wait(350)}
+      if(it.read){for(let k=0;k<3;k++){await say(`${k+1}. ${it.opts[k]}`,"N");if(run!==S.run)return;await wait(250)}}
+      else{await wait(300);await say("Question. "+it.q,"N");if(run!==S.run)return}
+      ic.classList.remove("on");
+      if(r===1){lb.textContent="もう一度放送します";await wait(1500);if(run!==S.run)return}
+    }
+    lb.textContent="解答してください";$("#nx").disabled=false;bmi.style.width="100%";
+    startTimer(10,next,l=>head(l,"解答時間"));
+  })();
+}
+function scriptHTML(it){
+  const nm={W:"★",M:"☆",N:""};
+  let h=it.lines.map(([w,t])=>`${nm[w]?nm[w]+": ":""}${esc(t)}`).join("<br>");
+  if(it.read)h+="<br>"+it.opts.map((o,k)=>`${k+1}. ${esc(o)}`).join("<br>");
+  else h+=`<br><b>Question:</b> ${esc(it.q)}`;
+  return h;
+}
+
+/* ===================== リーディング・ライティング ===================== */
+function answered(n){const x=RW()[n];return x.t==="r"?S.ra[x.k]!=null:wcount(S.wa[x.k])>0}
+function flagged(n){const x=RW()[n];return x.t==="r"?!!S.rf[x.k]:!!S.wf[x.k]}
+function rwTimer(){
+  const left=Math.max(0,Math.ceil((S.end-Date.now())/1000));
+  startTimer(left,()=>{S.done.rw=true;go("result")},l=>head(l,"残り時間"));
+}
+function rw(){
+  S.run++;
+  if(S.ov)return overview();
+  const R=RW(),x=R[S.i];
+  if(x.t==="r")readQ(x.k);else writeQ(x.k);
+  tool(`<div class="grp"><button class="btn" id="ovb">問題一覧</button><button class="btn flag" id="fl" aria-pressed="${flagged(S.i)}">見直し</button></div>
+    <div class="grp"><button class="btn" id="pv" ${S.i===0?"disabled":""}>前へ</button>
+    <button class="btn primary" id="nx">${S.i<R.length-1?"次へ":"問題一覧へ"}</button></div>`);
+  $("#ovb").onclick=()=>{S.ov=true;rw()};
+  $("#fl").onclick=()=>{const x=RW()[S.i];if(x.t==="r")S.rf[x.k]=!S.rf[x.k];else S.wf[x.k]=!S.wf[x.k];$("#fl").setAttribute("aria-pressed",flagged(S.i))};
+  $("#pv").onclick=()=>{S.i--;rw();window.scrollTo(0,0)};
+  $("#nx").onclick=()=>{if(S.i<R.length-1)S.i++;else S.ov=true;rw();window.scrollTo(0,0)};
+  if(!tick)rwTimer();
+}
+function passageHTML(key){
+  const p=G().pas[key];
+  return `<div class="passage">${p.head?`<div class="mail-h">${p.head}</div>`:""}${p.title?`<h4>${p.title}</h4>`:""}<p class="en" style="font-size:16px">${p.body}</p></div>`;
+}
+function readQ(k){
+  const it=G().read[k];const no=k+1;
+  const stem=it.blank?`<div class="qstem"><span class="no">(${no})</span><p style="min-width:0;line-height:1.8">本文の空所 <span class="blank">(${it.blank})</span> に入れるのに最も適切なもの</p></div>`
+    :`<div class="qstem"><span class="no">(${no})</span><p class="en" style="min-width:0">${it.q}</p></div>`;
+  const opts=`<div class="opts" role="radiogroup" aria-label="(${no})の解答">${it.opts.map((o,j)=>`<button class="opt" role="radio" aria-checked="${S.ra[k]===j}" data-k="${j}"><span class="rd"></span><span class="k">${j+1}</span><span class="t">${esc(o)}</span></button>`).join("")}</div>`;
+  main.innerHTML=`<div>
+    <div class="qbar"><b>リーディング　大問${it.part}</b><span class="qn">(${no})　問題 ${S.i+1} / ${RW().length}</span></div>
+    <div class="qframe">
+      <p class="direc">${G().rdir[it.part]}</p>
+      ${it.pas?`<div class="split"><div class="pane scroll">${passageHTML(it.pas)}</div><div class="pane stack">${stem}${opts}</div></div>`:`${stem}${opts}`}
+    </div></div>`;
+  main.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{S.ra[k]=+b.dataset.k;main.querySelectorAll(".opt").forEach(x=>x.setAttribute("aria-checked",x===b))});
+}
+function writeQ(k){
+  const it=G().write[k];
+  main.innerHTML=`<div>
+    <div class="qbar"><b>ライティング　${it.label}</b><span class="qn">問題 ${S.i+1} / ${RW().length}</span></div>
+    <div class="qframe">
+      <p class="direc">${it.instr}</p>
+      <div class="split">
+        <div class="pane scroll"><div class="passage"><p class="en" style="font-size:16px">${it.prompt}</p></div></div>
+        <div class="pane stack" style="gap:8px">
+          ${it.before?`<p class="en" style="font-size:16px">${it.before}</p>`:""}
+          <label for="ta${k}" class="muted" style="font-size:13px">解答欄</label>
+          <textarea id="ta${k}" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off">${esc(S.wa[k])}</textarea>
+          ${it.after?`<p class="en" style="font-size:16px">${it.after}</p>`:""}
+          <div class="wc" id="wc"></div>
+        </div>
+      </div>
+    </div></div>`;
+  const ta=$("#ta"+k),wc=$("#wc");
+  const upd=()=>{wc.innerHTML=`<span>語数：<b>${wcount(ta.value)}</b>語</span><span>語数の目安 ${it.min}語～${it.max}語</span>`};
+  ta.oninput=()=>{S.wa[k]=ta.value;upd()};upd();
+}
+function overview(){
+  const R=RW();
+  const un=R.filter((_,n)=>!answered(n)).length,fl=R.filter((_,n)=>flagged(n)).length;
+  const card=n=>{const x=R[n];const lab=x.t==="r"?`リーディング 大問${G().read[x.k].part}`:`ライティング ${G().write[x.k].label}`;
+    return `<button class="ov ${answered(n)?"ans":""} ${flagged(n)?"flg":""}" data-g="${n}"><b>${x.t==="r"?`(${x.k+1})`:`W${x.k+1}`}</b><span>${lab}</span><span class="st">${answered(n)?"解答済み":"未解答"}</span></button>`};
+  main.innerHTML=`<section class="panel stack">
+    <h2>問題一覧</h2>
+    <div class="legend"><span>未解答：${un}問</span><span>見直し：${fl}問</span><span>番号を押すとその問題に移動します</span></div>
+    ${S.scope!=="write"?`<b style="font-size:14px">リーディング</b><div class="ovgrid">${R.map((x,n)=>x.t==="r"?card(n):"").join("")}</div>`:""}
+    ${S.scope!=="read"?`<b style="font-size:14px">ライティング</b><div class="ovgrid">${R.map((x,n)=>x.t==="w"?card(n):"").join("")}</div>`:""}
+    ${S.cf?`<div class="dialog" role="alertdialog" aria-labelledby="cft"><b id="cft">解答を終了しますか？</b>
+      <p style="font-size:14px">${un?`未解答の問題が${un}問あります。`:""}${fl?`見直しの印がついた問題が${fl}問あります。`:""}終了すると、この試験には戻れません。</p>
+      <div class="row"><button class="btn primary" id="cfY">終了する</button><button class="btn" id="cfN">キャンセル</button></div></div>`:""}
+  </section>`;
+  main.querySelectorAll(".ov").forEach(b=>b.onclick=()=>{S.i=+b.dataset.g;S.ov=false;S.cf=false;rw()});
+  tool(`<div class="grp"><button class="btn" id="bk">問題に戻る</button></div><div class="grp"><button class="btn primary" id="endb">解答を終了する</button></div>`);
+  $("#bk").onclick=()=>{S.ov=false;S.cf=false;rw()};
+  $("#endb").onclick=()=>{S.cf=true;rw();$("#cfY").focus()};
+  if($("#cfY")){$("#cfY").onclick=()=>{S.done.rw=true;go("result")};$("#cfN").onclick=()=>{S.cf=false;rw()}}
+  if(!tick)rwTimer();
+}
+
+/* ===================== 結果 ===================== */
+function result(){
+  S.sec=null;head(null);tool(null);chrome();
+  const g=G();
+  const lc=g.listen.filter((x,k)=>S.la[k]===x.ans).length,rc=g.read.filter((x,k)=>S.ra[k]===x.ans).length;
+  const selfN=Object.values(S.self).filter(v=>v==="ok").length,wN=g.write.map((_,k)=>wcount(S.wa[k]));
+  const reps=Object.values(S.rep).reduce((a,b)=>a+b,0);
+  const na='<b class="na">未受験</b>';
+  const rv=(it,my,label,extra)=>`<div class="rv">
+    <div class="row"><span class="tag ${my===it.ans?"ok":"ng"}">${my===it.ans?"正解":"不正解"}</span><b>${label}</b>
+      <span class="muted" style="font-size:13px">あなたの解答：${my==null?"未解答":my+1}　正解：${it.ans+1}</span></div>
+    ${extra||""}<p style="font-size:14px">${it.jp}</p></div>`;
+  const stemOf=it=>it.blank?`${passageTitle(it.pas)} 本文の空所 (${it.blank})`:it.q;
+  main.innerHTML=`<section class="panel stack">
+    <div class="row"><h1>${S.name?esc(S.name)+"さん、":""}おつかれさまでした</h1>${S.aborted?'<span class="stopped">途中で中止</span>':""}</div>
+    <p class="muted">${g.label}　${S.scope==="all"?"模擬試験":SCOPES.find(x=>x[0]===S.scope)[1]}の結果</p>
+    <div class="sum">
+      ${inS("listen")?`<div><span>リスニング</span>${S.started.listen?`<b>${lc} / ${g.listen.length}</b>`:na}</div>`:""}
+      ${inS("read")?`<div><span>リーディング</span>${S.started.rw?`<b>${rc} / ${g.read.length}</b>`:na}</div>`:""}
+      ${inS("write")?`<div><span>ライティング 語数</span>${S.started.rw?`<b>${wN.join("・")}</b>`:na}</div>`:""}
+      ${inS("speak")?`<div><span>スピーキング 自己評価</span>${S.started.speak?`<b id="selfsum">${selfN} / ${g.speak.qs.length}</b>`:na}</div>`:""}
+    </div>
+    <p class="note">本番はCSEスコアで合否が判定されます。この模擬の正答数はスコアに換算していません。${S.aborted?"途中で中止したため、受験していない問題は未解答として扱っています。":""}${reps?`スピーキングで「もう一度聞く」を${reps}回使いました。本番では評価に影響する場合があります。`:""}</p>
+  </section>
+  ${inS("speak")?`<details ${S.started.speak?"open":""}><summary>スピーキング：解答例と自己評価</summary><div class="dbody">
+    <div class="passage"><p class="en" style="font-size:15px"><b>${g.speak.title}</b><br>${g.speak.passage}</p>${g.speak.art()}</div>
+    ${g.speak.qs.map((q,k)=>`<div class="rv"><b>No. ${q.n}</b><p class="en" style="font-size:15px">${esc(q.q)}${q.follow?`<br><span class="muted" style="font-size:13px">${esc(q.follow)}</span>`:""}</p>
+      <div class="model">解答例：${esc(q.a)}</div>
+      <div class="selfrate" data-q="${k}">${[["ok","答えられた"],["mid","一部言えた"],["ng","言えなかった"]].map(([v,l])=>`<button aria-pressed="${S.self[k]===v}" data-v="${v}">${l}</button>`).join("")}</div></div>`).join("")}
+    <p class="note">${g.speak.tip}</p>
+  </div></details>`:""}
+  ${inS("listen")?`<details ${S.scope==="listen"?"open":""}><summary>リスニング：答え合わせ</summary><div class="dbody">
+    ${g.listen.map((it,k)=>rv(it,S.la[k],`第${it.part}部 No. ${k+1}`,`<div class="mine" style="font-size:14px">${scriptHTML(it)}</div>${it.read?"":`<p class="en" style="font-size:14px">${it.opts.map((o,j)=>`${j+1}. ${esc(o)}`).join("　")}</p>`}`)).join("")}
+  </div></details>`:""}
+  ${inS("read")?`<details ${S.scope==="read"?"open":""}><summary>リーディング：答え合わせ</summary><div class="dbody">
+    ${Object.keys(g.pas).map(k=>`<div>${passageHTML(k)}</div>`).join("")}
+    ${g.read.map((it,k)=>rv(it,S.ra[k],`大問${it.part} (${k+1})`,`<p class="en" style="font-size:15px">${stemOf(it)}</p><p class="en" style="font-size:14px">${it.opts.map((o,j)=>`${j+1}. ${esc(o)}`).join("　")}</p>`)).join("")}
+  </div></details>`:""}
+  ${inS("write")?`<details ${S.started.rw?"open":""}><summary>ライティング：あなたの解答と解答例</summary><div class="dbody">
+    ${g.write.map((w,k)=>`<div class="rv"><b>${w.label}</b><div class="passage"><p class="en" style="font-size:14px">${w.prompt}</p></div>
+      <div class="mine">${S.wa[k].trim()?esc(S.wa[k]):"（未記入）"}</div>
+      <span class="wc"><span>語数 <b>${wN[k]}</b> 語（目安 ${w.min}〜${w.max}語）</span></span>
+      <div class="model">解答例：${esc(w.model)}</div></div>`).join("")}
+    <div id="aibox"></div>
+  </div></details>`:""}
+  <div class="row"><button class="btn primary" id="again">${g.label}${S.scope==="all"?"":"・"+SCOPES.find(x=>x[0]===S.scope)[1]}をもう一度受験する</button><button class="btn" id="hm">トップに戻る（級を選び直す）</button></div>`;
+  main.querySelectorAll(".selfrate").forEach(gr=>gr.querySelectorAll("button").forEach(b=>b.onclick=()=>{
+    S.self[gr.dataset.q]=b.dataset.v;gr.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));
+    const ss=$("#selfsum");if(ss)ss.textContent=`${Object.values(S.self).filter(v=>v==="ok").length} / ${g.speak.qs.length}`;
+  }));
+  $("#again").onclick=()=>{resetAll();go("intro",{sec:firstSec()})};
+  $("#hm").onclick=()=>{resetAll();go("home")};
+  setupAI();
+}
+function passageTitle(key){const p=G().pas[key];return p.title?`“${p.title}”`:"Eメール"}
+
+/* ===================== AI添削（使える環境のみ） ===================== */
+let samplerP=null;
+function getSampler(){if(!samplerP)samplerP=(window.claude&&window.claude.use)?window.claude.use("sample").catch(()=>null):Promise.resolve(null);return samplerP}
+async function setupAI(){
+  if(!$("#aibox"))return;
+  if(S.ai){$("#aibox").innerHTML=S.ai;return}
+  const sample=await getSampler();if(!sample||!$("#aibox"))return;
+  const g=G();
+  if(!S.wa.some(t=>t.trim())){$("#aibox").innerHTML=`<p class="note">ライティングに記入するとAI添削が使えます。</p>`;return}
+  $("#aibox").innerHTML=`<div class="ai"><b>AI添削</b><p style="font-size:14px">英検${g.label}の採点観点に沿って、あなたの英文にコメントします。</p><div class="row"><button class="btn primary" id="aig">添削してもらう</button></div></div>`;
+  $("#aig").onclick=async()=>{
+    const b=$("#aig");b.disabled=true;b.textContent="添削中…";
+    const task=g.write.map((w,k)=>({type:w.label,task:w.plain,range:`${w.min}-${w.max} words`,answer:S.wa[k].trim()||"(no answer)"}));
+    const prompt=`あなたは英検${g.label}ライティングの採点者です。${g.audience}の解答を、英検${g.label}の観点で採点・添削してください。
+${g.rubric}
+語数が目安から大きく外れている場合や、問いに答えていない場合は内容を減点。未解答は全て0点。
+コメントは受験者にわかる日本語で、良い点1つと直すべき点を具体的に。直した英文も示す。
+次のJSONだけを返す: {"results":[{"type":"…","scores":{"観点名":点数},"max":満点合計,"good":"…","fix":["…"],"revised":"英文"}]}
+解答: ${JSON.stringify(task)}`;
+    try{
+      const out=await sample.json(prompt,{modelTier:"default"});
+      const rs=(out&&out.results)||[];
+      const html=`<div class="ai"><b>AI添削の結果</b>${rs.map(r=>{const sc=r.scores||{};const tot=Object.values(sc).reduce((a,c)=>a+(+c||0),0);
+        return `<div class="rv"><b>${esc(r.type||"")}　${tot} / ${esc(r.max??"")}</b>
+          <table>${Object.entries(sc).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}</table>
+          ${r.good?`<p style="font-size:14px">◎ ${esc(r.good)}</p>`:""}${(r.fix||[]).map(f=>`<p style="font-size:14px">△ ${esc(f)}</p>`).join("")}
+          ${r.revised?`<div class="model">${esc(r.revised)}</div>`:""}</div>`}).join("")}
+        <p class="note">AIによる目安の採点です。本番の採点とは異なる場合があります。</p></div>`;
+      S.ai=html;if($("#aibox"))$("#aibox").innerHTML=html;
+    }catch(e){
+      if(e&&e.code==="not_granted"){$("#aibox").innerHTML="";return}
+      b.disabled=false;b.textContent="もう一度試す";
+      const m=document.createElement("p");m.className="note";m.textContent=e&&e.code==="rate_limited"?"混み合っています。少し時間をおいてから試してください。":"添削を取得できませんでした。もう一度試してください。";
+      b.parentElement.after(m);
+    }
+  };
+}
+
+render();
+</script>
+
+</body>
+</html>
