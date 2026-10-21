@@ -248,6 +248,16 @@ details[open]>summary::after{content:"－"}
 ol.pv{margin:4px 0 0;padding-left:1.6em;font-family:var(--en);font-size:16px;display:flex;flex-direction:column;gap:4px}
 small.bp{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11.5px;color:var(--muted);margin-top:4px}
 details.inner{margin-top:6px}
+.olist{display:flex;flex-direction:column;gap:3px;margin:4px 0 0}
+.olist>div{font-family:var(--en);font-size:14.5px;line-height:1.45}
+.olist .ja,.qja{display:block;font-family:var(--ui);font-size:13px;color:var(--muted);font-weight:400}
+.olist>div.ca .ja{color:var(--ok)}
+.qja{margin-top:2px}
+.scr{display:flex;flex-direction:column;gap:8px;font-size:14px}
+.scr p{margin:0;font-family:var(--en)}
+.scr p .ja{display:block;font-family:var(--ui);font-size:13px;color:var(--muted)}
+.scr .sp{font-weight:700;margin-right:4px}
+
 
 </style>
 </head>
@@ -688,6 +698,8 @@ function overview(){
 }
 
 /* ===================== 結果 ===================== */
+const olist=(en,ja,ans)=>`<div class="olist">${en.map((o,j)=>`<div class="${j===ans?"ca":""}">${j+1}. ${esc(o)}${ja&&ja[j]?`<span class="ja">${esc(ja[j])}</span>`:""}</div>`).join("")}</div>`;
+const scrHTML=(scr,lab)=>scr&&scr.length?`<details class="inner"><summary>${lab||"スクリプトと和訳を表示"}</summary><div class="dbody scr">${scr.map(([sp,en,ja])=>`<p>${sp?`<span class="sp">${sp}</span>`:""}${esc(en)}<span class="ja">${esc(ja)}</span></p>`).join("")}</div></details>`:"";
 function result(){
   S.sec=null;head(null);tool(null);chrome();
   const g=G();
@@ -715,13 +727,16 @@ function result(){
       <div class="model">解答例：${esc(q.a)}</div>
       <div class="selfrate" data-q="${k}">${[["ok","答えられた"],["mid","一部言えた"],["ng","言えなかった"]].map(([v,l])=>`<button aria-pressed="${S.self[k]===v}" data-v="${v}">${l}</button>`).join("")}</div></div>`).join("")}
     <p class="note">${g.speak.tip}</p></div></details>`:""}
-  ${inS("listen")?`<details ${S.scope==="listen"?"open":""}><summary>リスニング：答え合わせ</summary><div class="dbody">
-    ${g.listen.map((it,k)=>it.kind==="pas"?`<div class="rv"><div class="row"><b>第${it.part}部 (${it.label}) 英文</b><button class="btn sm" data-play="${it.f}">英文を聞く</button></div></div>`:`<div class="rv"><div class="row">${mark(S.la[k]===it.ans)}<b>第${it.part}部 No. ${it.no}</b><span class="muted" style="font-size:13px">あなたの解答：${S.la[k]==null?"未解答":S.la[k]+1}　正解：${it.ans+1}</span><button class="btn sm" data-play="${it.f}">音声を聞く</button></div>
-      ${it.read?"":`<p class="en" style="font-size:14px">${it.opts.map((o,j)=>`<span class="${j===it.ans?"ca":""}">${j+1}. ${esc(o)}</span>`).join("　")}</p>`}</div>`).join("")}
+  ${inS("listen")?`<details ${S.scope==="listen"?"open":""}><summary>リスニング：答え合わせ（和訳つき）</summary><div class="dbody">
+    ${g.listen.map((it,k)=>it.kind==="pas"?`<div class="rv"><div class="row"><b>第${it.part}部 (${it.label}) 英文</b><button class="btn sm" data-play="${it.f}">英文を聞く</button></div>${scrHTML(it.scr,"英文と和訳を表示")}</div>`:`<div class="rv"><div class="row">${mark(S.la[k]===it.ans)}<b>第${it.part}部 No. ${it.no}</b><span class="muted" style="font-size:13px">あなたの解答：${S.la[k]==null?"未解答":S.la[k]+1}　正解：${it.ans+1}</span><button class="btn sm" data-play="${it.f}">音声を聞く</button></div>
+      ${it.situ?`<p class="en" style="font-size:14px"><b>Situation:</b> ${esc(it.situ)}${it.sitj?`<span class="qja">${esc(it.sitj)}</span>`:""}</p>`:""}
+      ${it.sq?`<p class="en" style="font-size:14px"><b>Question:</b> ${esc(it.sq)}${it.sqj?`<span class="qja">${esc(it.sqj)}</span>`:""}</p>`:it.qq?`<p class="en" style="font-size:14px"><b>Question:</b> ${esc(it.qq[0])}<span class="qja">${esc(it.qq[1])}</span></p>`:""}
+      ${(it.read?it.oe:it.opts)?olist(it.read?it.oe:it.opts,it.oj,it.ans):""}
+      ${scrHTML(it.scr)}</div>`).join("")}
   </div></details>`:""}
-  ${inS("read")?`<details ${S.scope==="read"?"open":""}><summary>リーディング：答え合わせ</summary><div class="dbody">
+  ${inS("read")?`<details ${S.scope==="read"?"open":""}><summary>リーディング：答え合わせ（和訳つき）</summary><div class="dbody">
     ${g.read.map((it,k)=>`<div class="rv"><div class="row">${mark(S.ra[k]===it.ans)}<b>大問${it.p} ${qno(k)}</b><span class="muted" style="font-size:13px">あなたの解答：${S.ra[k]==null?"未解答":S.ra[k]+1}　正解：${it.ans+1}</span></div>
-      <p class="en" style="font-size:15px">${it.blank?`本文の空所 (${it.blank})`:it.q}</p><p class="en" style="font-size:14px">${it.o.map((o,j)=>`<span class="${j===it.ans?"ca":""}">${j+1}. ${esc(o)}</span>`).join("　")}</p></div>`).join("")}
+      <p class="en" style="font-size:15px">${it.blank?`本文の空所 (${it.blank})`:it.q}${it.qj?`<span class="qja">${it.qj}</span>`:""}</p>${olist(it.o,it.oj,it.ans)}</div>`).join("")}
     <details class="inner"><summary>本文を表示</summary><div class="dbody">${Object.keys(g.pas).map(passageHTML).join("")}</div></details>
   </div></details>`:""}
   ${inS("write")?`<details ${S.started.rw?"open":""}><summary>ライティング：あなたの解答と解答例</summary><div class="dbody">
