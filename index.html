@@ -477,7 +477,8 @@ function head(v,label){
   b.hidden=false;$("#tlabel").textContent=label||"残り時間";$("#tval").textContent=fmt(v);
   b.classList.toggle("warn",label==="残り時間"&&v<=300);
 }
-function hush(){S.run++;stopAudio();stopTimer();recPause();recStop()}
+let SEG=[];
+function hush(){S.run++;SEG.forEach(clearInterval);SEG=[];stopAudio();stopTimer();recPause();recStop()}
 /* ===================== 録音（スピーキング） ===================== */
 // 録音は MediaRecorder で行い、このブラウザの IndexedDB に保存する（外部には送らない）
 const REC={stream:null,state:"idle",items:{},cur:null,sid:0,ctx:null,an:null,buf:null,KEEP:30};
@@ -694,6 +695,27 @@ function intro(){
 /* ===================== スピーキング ===================== */
 const MIC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
 function interviewer(){return `<svg viewBox="0 0 300 225" aria-hidden="true"><rect width="300" height="225" fill="#d9dee6"/><rect y="150" width="300" height="75" fill="#b9a68a"/><rect x="30" y="30" width="70" height="90" fill="#c9d3df" stroke="#aab4c2"/><path d="M95 225 q0 -62 55 -66 q55 4 55 66z" fill="#34495e"/><path d="M136 160 l14 22 l14 -22z" fill="#f4f4f4"/><rect x="140" y="140" width="20" height="22" fill="#e8bf9c"/><ellipse cx="150" cy="112" rx="30" ry="36" fill="#f0c9a6"/><path d="M120 108 q2 -42 30 -42 q30 0 30 42 q-4 -24 -30 -26 q-24 2 -30 26z" fill="#3a2e28"/><circle cx="139" cy="110" r="3" fill="#2b2b2b"/><circle cx="161" cy="110" r="3" fill="#2b2b2b"/><ellipse class="mouth" cx="150" cy="129" rx="7.5" ry="1.2" fill="#7a2f2a"/><rect x="200" y="182" width="60" height="6" fill="#8d7a60"/></svg>`}
+/* S-CBTの準備時間・解答時間（秒）。ステップ0＝黙読・音読、1〜＝No.1〜。
+   出典：モチタン英語辞典（英検準2級・2級のS-CBTスピーキング解説）。記載のない級は過去問集の音源の時間のまま */
+/* S-CBTの準備時間・解答時間（秒）。ステップ0＝黙読・音読（ナレーション）、1〜＝No.1〜。
+   null は過去問集の音源の時間のまま。どの級もNo.3〜5の解答時間は60秒 */
+const SPK_TIME={
+  "3":[null,null,null,[["rec",60]],[["rec",60]],[["rec",null],["rec",60]]],
+  p2:[[["prep",20],["rec",60]],[["rec",40]],[["prep",20],["rec",30]],[["prep",20],["rec",60]],[["rec",60]],[["rec",60]]],
+  "2":[[["prep",20],["rec",60]],[["rec",40]],[["prep",20],["rec",60]],[["prep",10],["rec",60]],[["prep",10],["rec",60]]],
+  p1:[null,null,null,[["rec",60]],[["rec",60]]],
+};
+function speakPlan(st){
+  const all=SPK_TIME[G().key],cfg=all&&all[st.qk==null?0:st.qk+1],aph=st.ph||[];
+  if(!cfg||!aph.length)return{timed:false,list:[]};
+  let ci=0;const list=[];
+  for(const p of aph){const segs=[];while(ci<cfg.length){const [m,s]=cfg[ci++];segs.push({m,s});if(m===p[2])break}
+    if(!segs.length)segs.push({m:p[2],s:null});
+    segs.forEach(x=>{if(x.s==null)x.s=+(p[1]-p[0]).toFixed(1)});
+    list.push({at:p[0],end:p[1],segs})}
+  if(ci<cfg.length)list[list.length-1].segs.push(...cfg.slice(ci).map(([m,s])=>({m,s:s==null?20:s})));
+  return{timed:true,list};
+}
 function steps(){const sp=G().speak;return[{lab:sp.stepLabel||"黙読・音読",f:sp.instruct,card:"front",ph:sp.instructPh},...sp.qs.map((q,k)=>({lab:`No. ${q.n}`,f:q.f,card:q.card,ph:q.ph,qk:k,follow:q.follow}))]}
 function cardHTML(kind){
   const sp=G().speak;
@@ -721,19 +743,39 @@ function speak(){
   nx.onclick=next;
   if($("#rep"))$("#rep").onclick=()=>{S.rep[S.i]=(S.rep[S.i]||0)+1;go("speak",{i:S.i})};
   let last="";
+  const setMode=mode=>{
+    if(mode===last)return;last=mode;
+    mic.classList.toggle("on",mode==="rec");bm.classList.toggle("on",mode==="rec");lb.classList.toggle("on",mode==="rec");
+    lb.textContent=mode==="rec"?"録音中":mode==="prep"?"準備時間":"再生中";
+    sub.textContent=mode==="rec"?(st.qk==null?(G().speak.passage?"パッセージを音読してください":"ナレーションをしてください"):"英語で答えてください"):mode==="prep"?(st.qk==null?(G().speak.passage?"パッセージを黙読してください":"イラストを見て準備してください"):"カードを見て準備してください"):"面接委員の話を聞いてください";
+    const LB=G().speak.labels||["黙読","音読"];
+    if(st.qk==null)slab.textContent=mode==="rec"?LB[1]:mode==="prep"?LB[0]:(G().speak.stepLabel||"黙読・音読");
+    nx.disabled=mode!=="rec";if(mode==="talk"){cd.textContent="";bmi.style.width="0%";head(null)}
+    if(mode==="rec")recStart(S.i);else recPause();
+  };
+  const show=(mode,left,frac)=>{cd.textContent=left;bmi.style.width=(frac*100)+"%";head(left,mode==="rec"?"解答時間":"準備時間")};
+  // 準備・解答時間：S-CBTの秒数（SPK_TIME）がある級はアプリのタイマーで計り、その間は音源を止める
+  const PL=speakPlan(st);let pi=0,busy=false;
+  const runSegs=(ph)=>{
+    busy=true;try{AU.pause()}catch(e){}
+    let k=0;
+    const seg=()=>{
+      if(run!==S.run)return;
+      if(k>=ph.segs.length){busy=false;setMode("talk");try{AU.currentTime=ph.end}catch(e){}const q=AU.play();if(q&&q.catch)q.catch(()=>{});return}
+      const sg=ph.segs[k++],end=Date.now()+sg.s*1000;setMode(sg.m);
+      const iv=setInterval(()=>{if(run!==S.run){clearInterval(iv);return}
+        const ms=end-Date.now();show(sg.m,Math.max(0,Math.ceil(ms/1000)),1-Math.max(0,ms)/(sg.s*1000));
+        if(ms<=0){clearInterval(iv);seg()}},150);
+      SEG.push(iv);
+    };
+    seg();
+  };
   const onTime=t=>{
-    if(run!==S.run)return;
+    if(run!==S.run||busy)return;
+    if(PL.timed){if(pi<PL.list.length&&t>=PL.list[pi].at)runSegs(PL.list[pi++]);return}
     const p=st.ph.find(x=>t>=x[0]&&t<x[1]);const mode=p?p[2]:"talk";
-    if(mode!==last){last=mode;
-      mic.classList.toggle("on",mode==="rec");bm.classList.toggle("on",mode==="rec");lb.classList.toggle("on",mode==="rec");
-      lb.textContent=mode==="rec"?"録音中":mode==="prep"?"準備時間":"再生中";
-      sub.textContent=mode==="rec"?(st.qk==null?(G().speak.passage?"パッセージを音読してください":"ナレーションをしてください"):"英語で答えてください"):mode==="prep"?(st.qk==null?(G().speak.passage?"パッセージを黙読してください":"イラストを見て準備してください"):"カードを見て準備してください"):"面接委員の話を聞いてください";
-      const LB=G().speak.labels||["黙読","音読"];
-      if(st.qk==null)slab.textContent=mode==="rec"?LB[1]:mode==="prep"?LB[0]:(G().speak.stepLabel||"黙読・音読");
-      nx.disabled=mode!=="rec";if(mode==="talk"){cd.textContent="";bmi.style.width="0%";head(null)}
-      if(mode==="rec")recStart(S.i);else recPause();
-    }
-    if(p){const left=Math.max(0,Math.ceil(p[1]-t)),tot=p[1]-p[0];cd.textContent=left;bmi.style.width=((t-p[0])/tot*100)+"%";head(left,mode==="rec"?"解答時間":"準備時間")}
+    setMode(mode);
+    if(p){const left=Math.max(0,Math.ceil(p[1]-t)),tot=p[1]-p[0];show(mode,left,(t-p[0])/tot)}
   };
   // 口の動き：音源の音量（20コマ/秒）に合わせて開閉する
   const env=G().speak.env[st.f]||"",mouth=vid.querySelector(".mouth");let cur=0;
