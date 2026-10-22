@@ -294,8 +294,9 @@ const ORDER=["3","p2","2","p1"];
 const LQ=()=>G().listen.filter(x=>x.kind!=="pas");
 const SECS_ALL=[["speak","スピーキング"],["listen","リスニング"],["rw","リーディング・ライティング"]];
 const SCOPES=[["all","4技能すべて","本番と同じ流れ"],["speak","スピーキングだけ","面接形式"],["listen","リスニングだけ","本番音源"],["read","リーディングだけ","時間を計って解く"],["write","ライティングだけ","キーボード入力"]];
-const S={grade:"3",scope:"all",mode:"full",screen:"home",sec:null,i:0,run:0,la:{},ra:{},rf:{},wf:{},wa:["",""],done:{},started:{},self:{},rep:{},name:"",vol:1,ov:false,cf:false,ai:null,end:0,paused:false,pauseAt:0,aborted:false,explDone:{}};
-const G=()=>EX[S.grade];
+const S={grade:"3",ex:null,scope:"all",mode:"full",screen:"home",sec:null,i:0,run:0,la:{},ra:{},rf:{},wf:{},wa:["",""],done:{},started:{},self:{},rep:{},name:"",vol:1,ov:false,cf:false,ai:null,end:0,paused:false,pauseAt:0,aborted:false,explDone:{}};
+const exOf=g=>Object.keys(EX).filter(id=>EX[id].key===g).sort((a,b)=>EX[b].ord-EX[a].ord);
+const G=()=>{if(!EX[S.ex]||EX[S.ex].key!==S.grade)S.ex=exOf(S.grade)[0];return EX[S.ex]};
 const $=s=>document.querySelector(s);
 const main=$("#main");
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -457,7 +458,9 @@ function home(){
     <h1>英検S-CBT 模擬試験（過去問・本番音源）</h1>
     <p>実際の過去問と本番の音源を使い、英検S-CBTと同じ画面の進み方で受験できます。4技能を通して受けるほか、技能ごとの練習もできます。</p>
     <div class="stack" style="gap:6px"><span class="muted" style="font-size:13px" id="glab">受験する級</span>
-      <div class="grades" role="radiogroup" aria-labelledby="glab">${ORDER.map(k=>{const v=EX[k];return `<button class="gbtn" role="radio" aria-checked="${S.grade===k}" data-g="${k}"><b>${v.label}</b><span>${v.title}</span></button>`}).join("")}</div></div>
+      <div class="grades" role="radiogroup" aria-labelledby="glab">${ORDER.filter(k=>exOf(k).length).map(k=>{const v=EX[exOf(k)[0]];return `<button class="gbtn" role="radio" aria-checked="${S.grade===k}" data-g="${k}"><b>${v.label}</b><span>${exOf(k).length}回分</span></button>`}).join("")}</div></div>
+    <div class="stack" style="gap:6px"><span class="muted" style="font-size:13px" id="elab">年度・回</span>
+      <div class="grades" role="radiogroup" aria-labelledby="elab">${exOf(S.grade).map(id=>`<button class="gbtn" role="radio" aria-checked="${S.ex===id}" data-e="${id}"><b>${EX[id].title}</b><span>${id===exOf(S.grade)[0]?"最新":"&nbsp;"}</span></button>`).join("")}</div></div>
     <div class="stack" style="gap:6px"><span class="muted" style="font-size:13px" id="slab">受験する範囲</span>
       <div class="scopes" role="radiogroup" aria-labelledby="slab">${SCOPES.map(([k,l,d])=>`<button class="gbtn" role="radio" aria-checked="${S.scope===k}" data-s="${k}"><b>${l}</b><span>${d}</span></button>`).join("")}</div></div>
     <div class="flow" ${S.scope==="all"?"":"hidden"}>
@@ -475,9 +478,10 @@ function home(){
     ${FS.mode!=="url"?`<p class="muted" style="font-size:13px">読み込んだフォルダ：${esc(FS.name)}　<button class="btn sm" id="repick">フォルダを選び直す</button></p>`:""}
     <p class="note">出典：${g.src}　${g.title}。${g.key==="3"?"3級のライティングは2024年度から加わったEメール問題（英検協会の公表例）を含めています。":""}</p>
     <p class="note" ${S.scope==="all"||S.scope==="speak"?"":"hidden"}>本番のスピーキングはマイクで録音されます。この模擬では録音しないので、マイクが赤くなっている間に声に出して答える練習をしてください。試験中は右上の「中止」でいつでも一時停止・中止できます。</p>
-    <div class="row"><button class="btn primary" id="start">${g.label}${S.scope==="all"?"の試験":"・"+SCOPES.find(x=>x[0]===S.scope)[1]}を開始する</button></div>
+    <div class="row"><button class="btn primary" id="start">${g.label}（${g.title}）${S.scope==="all"?"の試験":"・"+SCOPES.find(x=>x[0]===S.scope)[1]}を開始する</button></div>
   </section>`;
-  main.querySelectorAll(".gbtn[data-g]").forEach(b=>b.onclick=()=>{S.grade=b.dataset.g;home()});
+  main.querySelectorAll(".gbtn[data-g]").forEach(b=>b.onclick=()=>{S.grade=b.dataset.g;S.ex=exOf(S.grade)[0];home()});
+  main.querySelectorAll(".gbtn[data-e]").forEach(b=>b.onclick=()=>{S.ex=b.dataset.e;home()});
   main.querySelectorAll(".gbtn[data-s]").forEach(b=>b.onclick=()=>{S.scope=b.dataset.s;home()});
   $("#nm").oninput=e=>{S.name=e.target.value;chrome()};
   if($("#md"))$("#md").onchange=e=>S.mode=e.target.value;
@@ -648,7 +652,7 @@ function rw(){
 function passageHTML(key){
   const p=G().pas[key];
   let h=`<div class="passage">${p.head?`<div class="mail-h">${p.head}</div>`:""}${p.title?`<h4>${p.title}</h4>`:""}<p class="en" style="font-size:16px">${p.body}</p>${p.notes?`<p class="pnotes">${p.notes}</p>`:""}</div>`;
-  if(p.body2)h+=`<div class="passage" style="margin-top:10px"><div class="mail-h">${p.head2}</div><p class="en" style="font-size:16px">${p.body2}</p></div>`;
+  for(const n of [2,3])if(p["body"+n])h+=`<div class="passage" style="margin-top:10px"><div class="mail-h">${p["head"+n]}</div><p class="en" style="font-size:16px">${p["body"+n]}</p></div>`;
   return h;
 }
 const qno=k=>`(${k+1})`;
