@@ -257,6 +257,17 @@ details.inner{margin-top:6px}
 .scr p{margin:0;font-family:var(--en)}
 .scr p .ja{display:block;font-family:var(--ui);font-size:13px;color:var(--muted)}
 .scr .sp{font-weight:700;margin-right:4px}
+.myrec{border:1px solid var(--line2);background:var(--sunk);padding:8px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.myrec b{font-size:13px}
+.myrec audio{height:36px;max-width:100%;flex:1 1 260px}
+.myrec a{font-size:13px}
+.myrec.none{color:var(--muted);font-size:13px}
+.lvl{height:8px;background:var(--line);border-radius:4px;overflow:hidden;flex:1 1 160px;min-width:120px}
+.lvl i{display:block;height:100%;width:0;background:var(--ok);transition:width .08s}
+.miccheck{border:1px solid var(--line2);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.recs{display:flex;flex-direction:column;gap:10px}
+.recs details summary{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline}
+.recs .when{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
 
 
 </style>
@@ -411,7 +422,102 @@ function head(v,label){
   b.hidden=false;$("#tlabel").textContent=label||"残り時間";$("#tval").textContent=fmt(v);
   b.classList.toggle("warn",label==="残り時間"&&v<=300);
 }
-function hush(){S.run++;stopAudio();stopTimer()}
+function hush(){S.run++;stopAudio();stopTimer();recPause();recStop()}
+/* ===================== 録音（スピーキング） ===================== */
+// 録音は MediaRecorder で行い、このブラウザの IndexedDB に保存する（外部には送らない）
+const REC={stream:null,state:"idle",items:{},cur:null,sid:0,ctx:null,an:null,buf:null,KEEP:30};
+async function micOn(){
+  if(REC.stream&&REC.stream.active)return true;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.MediaRecorder){REC.state="unsupported";return false}
+  try{
+    REC.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});REC.state="ok";
+    try{REC.ctx=new (window.AudioContext||window.webkitAudioContext)();const src=REC.ctx.createMediaStreamSource(REC.stream);REC.an=REC.ctx.createAnalyser();REC.an.fftSize=512;src.connect(REC.an);REC.buf=new Uint8Array(REC.an.fftSize)}catch(e){REC.an=null}
+    return true;
+  }catch(e){REC.state=e&&(e.name==="NotAllowedError"||e.name==="SecurityError")?"denied":"nomic";return false}
+}
+function micOff(){recStop();if(REC.stream){REC.stream.getTracks().forEach(t=>t.stop());REC.stream=null}if(REC.ctx){try{REC.ctx.close()}catch(e){}REC.ctx=null;REC.an=null}if(REC.state==="ok")REC.state="idle"}
+function micLevel(){if(!REC.an)return 0;REC.an.getByteTimeDomainData(REC.buf);let m=0;for(const v of REC.buf){const d=Math.abs(v-128);if(d>m)m=d}return Math.min(1,m/64)}
+function recMime(){if(!window.MediaRecorder)return"";for(const m of["audio/webm;codecs=opus","audio/webm","audio/mp4","audio/ogg;codecs=opus"])try{if(MediaRecorder.isTypeSupported(m))return m}catch(e){}return""}
+const recExt=t=>/mp4|aac/.test(t)?"m4a":/ogg/.test(t)?"ogg":"webm";
+function recStart(i){
+  if(!REC.stream||!REC.stream.active)return;
+  const c=REC.cur;
+  if(c&&c.i===i){if(c.mr.state==="paused"){c.mr.resume();c.t0=Date.now()}return}
+  recStop();
+  let mr;try{const m=recMime();mr=new MediaRecorder(REC.stream,m?{mimeType:m}:undefined)}catch(e){return}
+  const cur={i,mr,chunks:[],ms:0,t0:Date.now()};
+  mr.ondataavailable=e=>{if(e.data&&e.data.size)cur.chunks.push(e.data)};
+  mr.onstop=()=>{const blob=new Blob(cur.chunks,{type:mr.mimeType||cur.chunks[0]?.type||"audio/webm"});if(!blob.size)return;
+    const old=REC.items[i];if(old&&old.url)URL.revokeObjectURL(old.url);
+    REC.items[i]={blob,url:URL.createObjectURL(blob),secs:Math.max(1,Math.round(cur.ms/1000))};recSave();
+    if(S.screen==="result"){const box=document.querySelector(`.myrec[data-step="${i}"]`);if(box){box.outerHTML=myRecHTML(i);wireAudios(main)}}};
+  try{mr.start(1000)}catch(e){return}
+  REC.cur=cur;
+}
+function recPause(){const c=REC.cur;if(c&&c.mr.state==="recording"){try{c.mr.pause()}catch(e){}c.ms+=Date.now()-c.t0}}
+function recStop(){const c=REC.cur;if(!c)return;REC.cur=null;if(c.mr.state==="recording")c.ms+=Date.now()-c.t0;if(c.mr.state!=="inactive")try{c.mr.stop()}catch(e){}}
+function recReset(){recStop();Object.values(REC.items).forEach(x=>x.url&&URL.revokeObjectURL(x.url));REC.items={};REC.sid=0}
+const recDB=(fn)=>new Promise(res=>{try{const r=indexedDB.open("eiken-scbt-rec",1);
+  r.onupgradeneeded=()=>r.result.createObjectStore("sessions",{keyPath:"id"});
+  r.onsuccess=()=>{try{const tx=r.result.transaction("sessions","readwrite");const out=fn(tx.objectStore("sessions"));tx.oncomplete=()=>res(out&&out.result!==undefined?out.result:true);tx.onerror=()=>res(null)}catch(e){res(null)}};
+  r.onerror=()=>res(null)}catch(e){res(null)}});
+function recSave(){
+  const ids=Object.keys(REC.items);if(!ids.length)return;
+  if(!REC.sid)REC.sid=Date.now();
+  const g=G(),items={};ids.forEach(k=>{const x=REC.items[k];items[k]={blob:x.blob,secs:x.secs}});
+  const rec={id:REC.sid,at:REC.sid,ex:g.id,label:g.label,title:g.title,name:S.name||"",items};
+  recDB(st=>st.put(rec)).then(()=>recDB(st=>st.getAllKeys())).then(keys=>{
+    if(Array.isArray(keys)&&keys.length>REC.KEEP){const old=keys.sort((a,b)=>a-b).slice(0,keys.length-REC.KEEP);recDB(st=>old.forEach(k=>st.delete(k)))}});
+}
+const recAll=()=>recDB(st=>st.getAll()).then(a=>Array.isArray(a)?a.sort((x,y)=>y.at-x.at):[]);
+function stepName(g,i){const sp=g.speak;if(+i===0)return sp.passage?"音読":"ナレーション";const q=sp.qs[i-1];return q?`No. ${q.n}`:`No. ${i}`}
+const dt=t=>{const d=new Date(t),p=n=>String(n).padStart(2,"0");return`${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`};
+const recFile=(lab,title,at,step,blob)=>`英検${lab}_${title.replace(/\s+/g,"")}_${dt(at).replace(/[\/: ]/g,"").slice(0,12)}_${step.replace(/[.\s]/g,"")}.${recExt(blob.type)}`;
+function myRecHTML(i){
+  const x=REC.items[i],g=G();
+  if(!x){const why=REC.state==="denied"?"マイクの使用が許可されなかったため録音していません":REC.state==="unsupported"?"このブラウザは録音に対応していません":REC.state==="nomic"?"マイクが見つからなかったため録音していません":"録音はありません";return`<div class="myrec none" data-step="${i}">${why}</div>`}
+  return`<div class="myrec" data-step="${i}"><b>あなたの録音（${x.secs}秒）</b><audio controls preload="metadata" src="${x.url}"></audio><a href="${x.url}" download="${esc(recFile(g.label,g.title,REC.sid||Date.now(),stepName(g,i),x.blob))}">保存</a></div>`;
+}
+
+
+// 録音の<audio>：長さを確定させ（Chromeのwebmは長さ不明になるため）、同時再生を防ぐ
+function wireAudios(root){root.querySelectorAll(".myrec audio").forEach(a=>{if(a.dataset.w)return;a.dataset.w="1";
+  a.addEventListener("loadedmetadata",function fix(){if(a.duration===Infinity||isNaN(a.duration)){a.currentTime=1e7;a.addEventListener("timeupdate",function t(){a.removeEventListener("timeupdate",t);a.currentTime=0},{once:true})}},{once:true});
+  a.addEventListener("play",()=>{stopAudio();document.querySelectorAll(".playing").forEach(x=>x.classList.remove("playing"));document.querySelectorAll(".myrec audio").forEach(o=>{if(o!==a)o.pause()})})})}
+/* ===================== 録音の振り返り ===================== */
+let recURLs=[];
+async function recs(){
+  S.sec=null;head(null);tool(null);chrome();
+  recURLs.forEach(u=>URL.revokeObjectURL(u));recURLs=[];
+  main.innerHTML=`<section class="panel stack"><h1>録音の振り返り</h1><p class="muted">読み込み中…</p></section>`;
+  const all=await recAll();if(S.screen!=="recs")return;
+  const u=b=>{const x=URL.createObjectURL(b);recURLs.push(x);return x};
+  main.innerHTML=`<section class="panel stack">
+    <div class="row"><h1>録音の振り返り</h1><button class="btn" id="hm2">トップに戻る</button></div>
+    <p class="muted" style="font-size:13px">スピーキングの解答を、受験した回ごとに保存しています（新しい順・最新${REC.KEEP}回分）。録音はこのパソコンのこのブラウザの中だけに保存され、外部には送られません。ブラウザの閲覧データを消すと録音も消えます。残したい録音は「保存」でファイルにしてください。</p>
+    ${all.length?`<div class="recs">${all.map((r,n)=>{const g=EX&&EX[r.ex];const ks=Object.keys(r.items).sort((a,b)=>a-b);
+      return`<details ${n===0?"open":""}><summary><b>${esc(r.label)}　${esc(r.title)}</b><span class="when">${dt(r.at)}</span>${r.name?`<span class="muted" style="font-size:13px">${esc(r.name)}</span>`:""}<span class="muted" style="font-size:13px">${ks.length}件</span></summary><div class="dbody">
+        ${ks.map(k=>{const it=r.items[k];const sp=g&&g.speak;const q=sp&&+k>0?sp.qs[k-1]:null;const step=g?stepName(g,k):(+k===0?"ナレーション・音読":`No. ${k}`);const url=u(it.blob);
+          return`<div class="rv"><div class="row"><b>${step}</b>${g?`<button class="btn sm" data-play="${+k===0?sp.model:q.f}">${+k===0?"お手本を聞く":"質問を聞く"}</button>`:""}</div>
+          ${q?`<p class="en" style="font-size:15px">${esc(q.q)}</p>`:""}
+          <div class="myrec"><b>あなたの録音（${it.secs}秒）</b><audio controls preload="metadata" src="${url}"></audio><a href="${url}" download="${esc(recFile(r.label,r.title,r.at,step,it.blob))}">保存</a></div>
+          ${g?(+k===0?(sp.narration?`<div class="model">ナレーション解答例：${esc(sp.narration)}</div>`:""):`<div class="model">解答例：${esc(q.a)}</div>`):""}</div>`}).join("")}
+        <div class="row"><button class="btn sm warn" data-del="${r.id}">この回の録音を削除</button></div></div></details>`}).join("")}</div>`
+      :`<p>まだ録音はありません。スピーキングを受験すると、ここに録音が残ります。</p>`}
+  </section>`;
+  $("#hm2").onclick=()=>{stopAudio();go("home")};wireAudios(main);
+  main.querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{if(!confirmDel(b))return;await recDB(st=>st.delete(+b.dataset.del));recs()});
+  main.querySelectorAll("[data-play]").forEach(b=>b.onclick=()=>{
+    if(b.classList.contains("playing")){stopAudio();b.classList.remove("playing");return}
+    main.querySelectorAll(".playing").forEach(x=>x.classList.remove("playing"));b.classList.add("playing");main.querySelectorAll(".myrec audio").forEach(o=>o.pause());
+    const id=b.closest("details");const r=all.find(x=>id&&id.querySelector(`[data-del="${x.id}"]`));const keep=S.ex,kg=S.grade;
+    if(r&&EX[r.ex]){S.ex=r.ex;S.grade=EX[r.ex].key}
+    play(b.dataset.play,{onEnd:()=>b.classList.remove("playing"),onErr:()=>b.classList.remove("playing")});S.ex=keep;S.grade=kg;
+  });
+}
+// 削除は2回押しで確定（ダイアログを出さない）
+function confirmDel(b){if(b.dataset.armed){return true}b.dataset.armed="1";const t=b.textContent;b.textContent="もう一度押すと削除します";setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.textContent=t}},3000);return false}
+
 
 /* ===================== 枠 ===================== */
 function chrome(){
@@ -425,9 +531,9 @@ function chrome(){
   $("#abortBtn").hidden=!S.sec;
 }
 function tool(html){const t=$("#tool");if(!html){t.hidden=true;$("#mainwrap").classList.remove("hasfoot");return}t.hidden=false;$("#toolin").innerHTML=html;$("#mainwrap").classList.add("hasfoot")}
-function go(screen,extra={}){hush();Object.assign(S,{screen,cf:false,ov:false},extra);if(["speak","listen","rw"].includes(screen))S.started[screen]=true;render();window.scrollTo(0,0)}
-function render(){chrome();({home,intro,speak,listen,rw,result})[S.screen]()}
-function resetAll(){Object.assign(S,{la:{},ra:{},rf:{},wf:{},wa:["",""],done:{},started:{},self:{},rep:{},ai:null,end:0,elapsed:0,aborted:false,paused:false,explDone:{}})}
+function go(screen,extra={}){hush();if(!(screen==="speak"||(screen==="intro"&&(extra.sec||S.sec)==="speak")))micOff();Object.assign(S,{screen,cf:false,ov:false},extra);if(["speak","listen","rw"].includes(screen))S.started[screen]=true;render();window.scrollTo(0,0)}
+function render(){chrome();({home,intro,speak,listen,rw,result,recs})[S.screen]()}
+function resetAll(){recReset();Object.assign(S,{la:{},ra:{},rf:{},wf:{},wa:["",""],done:{},started:{},self:{},rep:{},ai:null,end:0,elapsed:0,aborted:false,paused:false,explDone:{}})}
 
 /* ===================== 一時停止・中止 ===================== */
 function pause(){
@@ -477,8 +583,8 @@ function home(){
       <div class="row"><button class="btn" id="check">テスト音声を再生</button><span class="muted" id="amsg" style="font-size:13px">確認中…</span></div></div>
     ${FS.mode!=="url"?`<p class="muted" style="font-size:13px">読み込んだフォルダ：${esc(FS.name)}　<button class="btn sm" id="repick">フォルダを選び直す</button></p>`:""}
     <p class="note">出典：${g.src}　${g.title}。${g.key==="3"?"3級のライティングは2024年度から加わったEメール問題（英検協会の公表例）を含めています。":""}</p>
-    <p class="note" ${S.scope==="all"||S.scope==="speak"?"":"hidden"}>本番のスピーキングはマイクで録音されます。この模擬では録音しないので、マイクが赤くなっている間に声に出して答える練習をしてください。試験中は右上の「中止」でいつでも一時停止・中止できます。</p>
-    <div class="row"><button class="btn primary" id="start">${g.label}（${g.title}）${S.scope==="all"?"の試験":"・"+SCOPES.find(x=>x[0]===S.scope)[1]}を開始する</button></div>
+    <p class="note" ${S.scope==="all"||S.scope==="speak"?"":"hidden"}>スピーキングは本番と同じく、マイクが赤くなっている間の声を録音します。録音は結果画面と「録音の振り返り」で聞き直せます（このブラウザの中だけに保存）。試験中は右上の「中止」でいつでも一時停止・中止できます。</p>
+    <div class="row"><button class="btn primary" id="start">${g.label}（${g.title}）${S.scope==="all"?"の試験":"・"+SCOPES.find(x=>x[0]===S.scope)[1]}を開始する</button><button class="btn" id="recsBtn">録音の振り返り</button></div>
   </section>`;
   main.querySelectorAll(".gbtn[data-g]").forEach(b=>b.onclick=()=>{S.grade=b.dataset.g;S.ex=exOf(S.grade)[0];home()});
   main.querySelectorAll(".gbtn[data-e]").forEach(b=>b.onclick=()=>{S.ex=b.dataset.e;home()});
@@ -487,6 +593,8 @@ function home(){
   if($("#md"))$("#md").onchange=e=>S.mode=e.target.value;
   if($("#check"))$("#check").onclick=()=>{play(G().speak.model,{onTime:t=>{if(t>6)stopAudio()},onErr:()=>{$("#amsg").innerHTML=`<b style="color:var(--ng)">再生できませんでした。</b>音源フォルダの場所を確認してください。`}})};
   $("#start").onclick=()=>{stopAudio();resetAll();go("intro",{sec:firstSec()})};
+  $("#recsBtn").onclick=()=>{stopAudio();go("recs")};
+  recAll().then(a=>{const b=$("#recsBtn");if(b&&a.length)b.textContent=`録音の振り返り（${a.length}回分）`});
   if($("#repick"))$("#repick").onclick=()=>{stopAudio();EX=null;setup()};
   checkAudio();
 }
@@ -494,7 +602,7 @@ function home(){
 /* ===================== 説明画面 ===================== */
 function introLines(){
   const g=G();
-  if(S.sec==="speak")return["本番の音源で、面接委員が英語で指示や質問をします。",`${g.speak.introLine||`問題カード${g.speak.card}のパッセージを20秒間黙読したあと、音読します。続いて質問No.1〜No.${g.speak.qs.length}に答えます。`}`,"マイクのアイコンが<b>赤色</b>になっている間が解答時間（録音中）です。赤くなる前に話し始めないでください。","解答時間が終わると自動で次に進みます。質問を聞き逃したときは「もう一度聞く」を押せますが、本番では評価に影響する場合があります。"];
+  if(S.sec==="speak")return["本番の音源で、面接委員が英語で指示や質問をします。",`${g.speak.introLine||`問題カード${g.speak.card}のパッセージを20秒間黙読したあと、音読します。続いて質問No.1〜No.${g.speak.qs.length}に答えます。`}`,"マイクのアイコンが<b>赤色</b>になっている間が解答時間で、その間のあなたの声を録音します。赤くなる前に話し始めないでください。","解答時間が終わると自動で次に進みます。質問を聞き逃したときは「もう一度聞く」を押せますが、本番では評価に影響する場合があります。"];
   if(S.sec==="listen")return[`全${LQ().length}問、第1部〜第${Object.keys(g.listen_parts).length}部です。各部の最初に説明の音声が流れます（「説明をとばす」で省略できます）。`,"解答時間が終わると自動で次の問題に進み、前の問題には戻れません。","選択肢が放送される問題は、画面には番号だけが表示されます。"];
   const both=S.scope==="all";
   return[S.mode==="free"?"制限時間はありません。経過時間が表示されます。":`制限時間は<b>${both?"リーディングとライティング合わせて":""}${limitMin()}分</b>です。${both?"時間配分は自由です。":""}`,
@@ -506,9 +614,17 @@ function introLines(){
 function intro(){
   head(null);
   const t=secs().find(s=>s[0]===S.sec)[1]+"テスト";
-  main.innerHTML=`<section class="panel stack"><h1>${t}</h1><ol style="margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:6px">${introLines().map(l=>`<li>${l}</li>`).join("")}</ol></section>`;
+  const sp=S.sec==="speak";
+  main.innerHTML=`<section class="panel stack"><h1>${t}</h1><ol style="margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:6px">${introLines().map(l=>`<li>${l}</li>`).join("")}</ol>
+    ${sp?`<div class="miccheck"><b>マイクの確認</b><span class="muted" style="font-size:13px">解答を録音して、結果画面と「録音の振り返り」で聞き直せます。ブラウザにマイクの使用を求められたら「許可」を選んでください。録音はこのブラウザの中だけに保存されます。</span>
+      <div class="row"><button class="btn" id="micbtn">マイクを確認する</button><div class="lvl" aria-hidden="true"><i id="lvl"></i></div></div><span id="micmsg" style="font-size:13px" class="muted"></span></div>`:""}</section>`;
   tool(`<span class="msg">準備ができたら「開始」を押してください</span><div class="grp"><button class="btn primary" id="go">開始</button></div>`);
-  $("#go").onclick=()=>{if(S.sec==="rw"){S.end=Date.now()+limitMin()*60000;S.elapsed=0}go(S.sec,{i:0})};
+  if(sp){const run=S.run,msg=$("#micmsg"),bar=$("#lvl");
+    const show=()=>{msg.innerHTML=REC.state==="ok"?"マイクを使えます。何か話して、緑のバーが動くか確かめてください。":REC.state==="denied"?`<b style="color:var(--ng)">マイクの使用が許可されていません。</b>アドレスバーの鍵（またはカメラ）マークからマイクを「許可」にすると録音できます。このまま録音なしで受験することもできます。`:REC.state==="nomic"?`<b style="color:var(--ng)">マイクが見つかりません。</b>マイクをつないでからもう一度押してください。`:REC.state==="unsupported"?"このブラウザは録音に対応していません。録音なしで受験できます。":""};
+    const loop=()=>{if(run!==S.run||S.screen!=="intro")return;bar.style.width=(micLevel()*100).toFixed(0)+"%";requestAnimationFrame(loop)};
+    $("#micbtn").onclick=async()=>{await micOn();show();if(REC.state==="ok")requestAnimationFrame(loop)};
+    if(REC.stream&&REC.stream.active){show();requestAnimationFrame(loop)}}
+  $("#go").onclick=async()=>{if(S.sec==="rw"){S.end=Date.now()+limitMin()*60000;S.elapsed=0}if(S.sec==="speak")await micOn();go(S.sec,{i:0})};
   $("#go").focus();
 }
 
@@ -536,7 +652,7 @@ function speak(){
       <div>${cardHTML(st.card)}</div>
     </div></div></div>`;
   const repN=S.rep[S.i]||0;
-  tool(`<span class="msg">録音のやり直しはできません</span><div class="grp">${st.qk!=null?`<button class="btn warn" id="rep">もう一度聞く${repN?`（${repN}回使用）`:""}</button>`:""}<button class="btn primary" id="nx" disabled>次へ</button></div>`);
+  tool(`<span class="msg">${REC.stream&&REC.stream.active?"赤いマイクの間、あなたの声を録音します":"録音なし（マイクが使えません）"}</span><div class="grp">${st.qk!=null?`<button class="btn warn" id="rep">もう一度聞く${repN?`（${repN}回使用）`:""}</button>`:""}<button class="btn primary" id="nx" disabled>次へ</button></div>`);
   const mic=$("#mic"),lb=$("#lbl"),sub=$("#sub"),cd=$("#cd"),bm=$("#bm"),bmi=$("#bmi"),vid=$("#vid"),nx=$("#nx"),slab=$("#slab");
   const next=()=>{if(run!==S.run)return;stopAudio();if(S.i<SS.length-1)go("speak",{i:S.i+1});else{S.done.speak=true;S.scope==="all"?go("intro",{sec:"listen"}):go("result")}};
   nx.onclick=next;
@@ -552,6 +668,7 @@ function speak(){
       const LB=G().speak.labels||["黙読","音読"];
       if(st.qk==null)slab.textContent=mode==="rec"?LB[1]:mode==="prep"?LB[0]:(G().speak.stepLabel||"黙読・音読");
       nx.disabled=mode!=="rec";if(mode==="talk"){cd.textContent="";bmi.style.width="0%";head(null)}
+      if(mode==="rec")recStart(S.i);else recPause();
     }
     if(p){const left=Math.max(0,Math.ceil(p[1]-t)),tot=p[1]-p[0];cd.textContent=left;bmi.style.width=((t-p[0])/tot*100)+"%";head(left,mode==="rec"?"解答時間":"準備時間")}
   };
@@ -562,6 +679,7 @@ function speak(){
     if(!AU.paused&&env){const i=Math.floor((AU.currentTime+0.03)*20);target=+(env[i]||0)}
     cur+= (target-cur)*(target>cur?0.6:0.35);
     mouth.setAttribute("ry",(1.2+cur*0.6).toFixed(2));mouth.setAttribute("rx",(7.5-cur*0.15).toFixed(2));
+    if(REC.cur&&REC.cur.mr.state==="recording"){const lv=micLevel();mic.style.boxShadow=`0 0 0 ${(2+lv*12).toFixed(1)}px rgba(200,40,40,${(0.15+lv*0.3).toFixed(2)})`}else if(mic.style.boxShadow)mic.style.boxShadow="";
     requestAnimationFrame(lip)};
   requestAnimationFrame(lip);
   setTimeout(()=>{if(run!==S.run)return;play(st.f,{onTime,onEnd:next,onErr:(why)=>{const e=$("#err");e.hidden=false;e.innerHTML=why==="blocked"?"音声の再生がブラウザに止められました。画面のどこかをクリックしてから「もう一度聞く」を押してください。":"音源ファイルを読み込めませんでした。「次へ」で先に進めます。";nx.disabled=false}})},300);
@@ -725,9 +843,11 @@ function result(){
   </section>
   ${inS("speak")?`<details ${S.started.speak?"open":""}><summary>スピーキング：解答例と自己評価</summary><div class="dbody">
     <div>${cardHTML("front")}</div>
-    <div class="row"><button class="btn" data-play="${g.speak.model}">${g.speak.passage?"音読":"ナレーション"}のお手本を聞く</button></div>
+    ${myRecHTML(0)}
+    <div class="row"><button class="btn" data-play="${g.speak.model}">${g.speak.passage?"音読":"ナレーション"}のお手本を聞く</button>${Object.keys(REC.items).length?'<button class="btn" id="toRecs">過去の録音も見る</button>':""}</div>
     ${g.speak.narration?`<div class="model">ナレーション解答例：${esc(g.speak.narration)}</div>`:""}
     ${g.speak.qs.map((q,k)=>`<div class="rv"><div class="row"><b>No. ${q.n}</b><button class="btn sm" data-play="${q.f}">質問を聞く</button></div><p class="en" style="font-size:15px">${esc(q.q)}${q.follow?`<br><span class="muted" style="font-size:13px">${esc(q.follow)}</span>`:""}</p>
+      ${myRecHTML(k+1)}
       <div class="model">解答例：${esc(q.a)}</div>
       <div class="selfrate" data-q="${k}">${[["ok","答えられた"],["mid","一部言えた"],["ng","言えなかった"]].map(([v,l])=>`<button aria-pressed="${S.self[k]===v}" data-v="${v}">${l}</button>`).join("")}</div></div>`).join("")}
     <p class="note">${g.speak.tip}</p></div></details>`:""}
@@ -756,10 +876,11 @@ function result(){
   }));
   main.querySelectorAll("[data-play]").forEach(b=>b.onclick=()=>{
     if(b.classList.contains("playing")){stopAudio();b.classList.remove("playing");return}
-    main.querySelectorAll(".playing").forEach(x=>x.classList.remove("playing"));b.classList.add("playing");
+    main.querySelectorAll(".playing").forEach(x=>x.classList.remove("playing"));b.classList.add("playing");main.querySelectorAll(".myrec audio").forEach(o=>o.pause());
     play(b.dataset.play,{onEnd:()=>b.classList.remove("playing"),onErr:()=>b.classList.remove("playing")});
   });
   $("#again").onclick=()=>{stopAudio();resetAll();go("intro",{sec:firstSec()})};
+  if($("#toRecs"))$("#toRecs").onclick=()=>{stopAudio();go("recs")};wireAudios(main);
   $("#hm").onclick=()=>{stopAudio();resetAll();go("home")};
   setupAI();
 }
