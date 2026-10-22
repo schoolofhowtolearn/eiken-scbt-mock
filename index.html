@@ -325,13 +325,27 @@ const RW=()=>[...(S.scope!=="write"?G().read.map((_,k)=>({t:"r",k})):[]),...(S.s
 
 /* ===================== 過去問フォルダの読み込み（公開版） ===================== */
 const DATA_NAME="S-CBT模擬試験データ.json";
-const FS={mode:EX?"url":null,root:null,map:null,prefix:"",urls:{},name:""};
+const nfc=x=>String(x).normalize("NFC"); // iPad・Mac・Google Drive では日本語のファイル名が分解形（NFD）になることがある
+const IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+const base=p=>p.slice(p.lastIndexOf("/")+1);
+// mode: url=HTMLと同じ場所 / dir=フォルダ（Chrome・Edge） / list=フォルダを選択（その他） / files=データと音源を1回分ずつ（iPad向け）
+const FS={mode:EX?"url":null,root:null,map:null,prefix:"",urls:{},name:"",aud:{},audKeys:new Set()};
+async function child(h,name,kind){
+  try{return kind==="dir"?await h.getDirectoryHandle(name):await h.getFileHandle(name)}catch(e){
+    const want=nfc(name);for await(const [n,c] of h.entries())if(nfc(n)===want&&c.kind===(kind==="dir"?"directory":"file"))return c;throw e}
+}
+function findInMap(p){
+  const m=FS.map,k=nfc(p);if(m.has(k))return m.get(k);
+  for(const [key,f] of m)if(key.endsWith("/"+k)||k.endsWith("/"+key))return f; // 1つ上・下の階層を選んだ場合
+  return null;
+}
 async function fileFor(path){
   const p=FS.prefix+path;
-  if(FS.map){const f=FS.map.get(p);if(!f)throw new Error("not found");return f}
+  if(FS.mode==="files"){const m=await audOf(G().id);const f=m&&m.get(nfc(base(path)));if(!f)throw new Error("not found");return f}
+  if(FS.map){const f=findInMap(p);if(!f)throw new Error("not found");return f}
   let h=FS.root;const seg=p.split("/");
-  for(let i=0;i<seg.length-1;i++)h=await h.getDirectoryHandle(seg[i]);
-  return await (await h.getFileHandle(seg[seg.length-1])).getFile();
+  for(let i=0;i<seg.length-1;i++)h=await child(h,seg[i],"dir");
+  return await (await child(h,seg[seg.length-1],"file")).getFile();
 }
 async function urlFor(f){
   const path=G().base+"/"+f;
@@ -342,6 +356,18 @@ async function urlFor(f){
 const idb=(op,val)=>new Promise(res=>{try{const r=indexedDB.open("eiken-scbt",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");
   r.onsuccess=()=>{try{const tx=r.result.transaction("kv",op==="get"?"readonly":"readwrite");const st=tx.objectStore("kv");
     const q=op==="get"?st.get("dir"):op==="del"?st.delete("dir"):st.put(val,"dir");q.onsuccess=()=>res(q.result);q.onerror=()=>res(null)}catch(e){res(null)}};r.onerror=()=>res(null)}catch(e){res(null)}});
+// iPad向け：問題データと音源をこのブラウザに保存しておき、次回は選び直さずに使う
+const fdb=(fn,mode="readwrite")=>new Promise(res=>{try{const r=indexedDB.open("eiken-scbt-files",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");
+  r.onsuccess=()=>{try{const tx=r.result.transaction("kv",mode);const q=fn(tx.objectStore("kv"));tx.oncomplete=()=>res(q&&"result"in q?q.result:true);tx.onerror=tx.onabort=()=>res(null)}catch(e){res(null)}};
+  r.onerror=()=>res(null)}catch(e){res(null)}});
+async function audOf(eid){
+  if(FS.aud[eid])return FS.aud[eid];
+  if(!FS.audKeys.has(eid))return null;
+  const o=await fdb(st=>st.get("aud:"+eid),"readonly");if(!o)return null;
+  const m=new Map(Object.entries(o));FS.aud[eid]=m;return m;
+}
+function needFiles(g){const out=new Set();const walk=v=>{if(typeof v==="string"){if(/\.mp3$/i.test(v))out.add(nfc(v))}else if(v&&typeof v==="object")Object.values(v).forEach(walk)};walk(g.speak);walk(g.listen);walk(g.listen_parts);return out}
+async function useDataText(t){EX=JSON.parse(t);if(!EX||!Object.keys(EX).length)throw new Error("baddata");FS.mode="files";FS.map=null;FS.root=null;FS.urls={};FS.prefix="";FS.name=""}
 async function loadData(readText){
   for(const pre of ["","過去問/"]){
     try{const t=await readText(pre+DATA_NAME);FS.prefix=pre;return JSON.parse(t)}catch(e){}
@@ -350,36 +376,46 @@ async function loadData(readText){
 }
 async function useHandle(h){
   FS.root=h;FS.map=null;FS.name=h.name;
-  const data=await loadData(async p=>{let d=h;const s=p.split("/");for(let i=0;i<s.length-1;i++)d=await d.getDirectoryHandle(s[i]);return (await (await d.getFileHandle(s[s.length-1])).getFile()).text()});
+  const data=await loadData(async p=>{let d=h;const s=p.split("/");for(let i=0;i<s.length-1;i++)d=await child(d,s[i],"dir");return (await (await child(d,s[s.length-1],"file")).getFile()).text()});
   FS.mode="dir";FS.urls={};EX=data;
 }
 async function useFileList(files){
   const m=new Map();let top="";
-  for(const f of files){const rp=f.webkitRelativePath||f.name;const i=rp.indexOf("/");top=rp.slice(0,i);m.set(rp.slice(i+1),f)}
-  FS.map=m;FS.root=null;FS.name=top;
-  const data=await loadData(async p=>{const f=m.get(p);if(!f)throw 0;return f.text()});
-  FS.mode="list";FS.urls={};EX=data;
+  for(const f of files){const rp=nfc(f.webkitRelativePath||f.name);const i=rp.indexOf("/");if(i<0){m.set(rp,f);continue}top=rp.slice(0,i);m.set(rp.slice(i+1),f)}
+  FS.map=m;FS.root=null;FS.name=top;FS.prefix="";
+  // データファイルがどの階層にあっても見つける
+  let dk=null;for(const k of m.keys())if(base(k)===nfc(DATA_NAME)&&(!dk||k.length<dk.length))dk=k;
+  if(!dk)throw new Error(files.length&&![...files].some(f=>f.webkitRelativePath)?"nofolder":"nodata");
+  FS.prefix=dk.slice(0,dk.length-base(dk).length);
+  EX=JSON.parse(await m.get(dk).text());FS.mode="list";FS.urls={};
 }
 async function setup(msg){
   $("#secname").textContent="英検S-CBT 模擬試験（過去問）";$("#lv").textContent="英検";$("#rail").innerHTML="";$("#abortBtn").hidden=true;$("#tbox").hidden=true;tool(null);
   const saved=window.showDirectoryPicker?await idb("get"):null;
+  const pcWay=`<div class="miccheck"><b>${IOS?"パソコンと同じ方法：":""}「過去問」フォルダをまるごと選ぶ</b>
+      <ol style="margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:4px;font-size:14px">
+        <li>「英検3級」〜「英検準1級」のフォルダと「${DATA_NAME}」が入っている<b>「過去問」フォルダ</b>を選びます。</li>
+        <li>「ファイルを表示しますか」「アップロードしますか」と聞かれたら許可してください（この端末の中で読むだけで、送信はしません）。</li>
+      </ol>
+      ${IOS?`<p class="muted" style="font-size:13px">iPadでは、Google Driveのフォルダをまるごと選ぶと全級の音源とPDF（数百MB）のダウンロードが必要になり、うまくいかないことがあります。その場合は上の方法を使ってください。</p>`:""}
+      <div class="row">${saved?`<button class="btn primary" id="reuse">前回のフォルダ（${esc(saved.name)}）を使う</button>`:""}
+        <button class="btn ${saved||IOS?"":"primary"}" id="pick">過去問フォルダを選ぶ</button>
+        <input type="file" id="dirIn" webkitdirectory directory multiple hidden></div></div>`;
+  const padWay=`<div class="miccheck"><b>${IOS?"iPad・Google Driveのときはこちら：":"iPadやスマートフォンの場合："}データと音源を1回分ずつ読み込む</b>
+      <ol style="margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:4px;font-size:14px">
+        <li>下のボタンで「過去問」フォルダの中にある<b>「${DATA_NAME}」</b>（1ファイル）を選びます。Google Driveの中から選べます。</li>
+        <li>次の画面で受ける回を選び、その回の<b>「音源」フォルダ</b>を選びます（1回分 約40MB）。</li>
+        <li>読み込んだデータと音源はこのiPadのブラウザに保存されるので、次からは選び直さずに使えます。</li>
+      </ol>
+      <div class="row"><button class="btn ${IOS?"primary":""}" id="pickData">「${DATA_NAME}」を選ぶ</button><input type="file" id="dataIn" hidden></div></div>`;
   main.innerHTML=`<section class="panel stack">
-    <h1>過去問フォルダを選んでください</h1>
-    <p>この模擬試験は、過去問の問題データと音源をこのパソコンの「過去問」フォルダから読み込みます。問題や音源がインターネットに送られることはありません。</p>
+    <h1>過去問のデータを読み込んでください</h1>
+    <p>この模擬試験は、過去問の問題データと音源を、あなたの端末やGoogle Driveにある「過去問」フォルダから読み込みます。問題や音源がインターネットに送られることはありません。</p>
     ${msg?`<p class="note" style="border-color:var(--ng)"><b style="color:var(--ng)">${msg}</b></p>`:""}
-    <ol style="margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:4px">
-      <li>下のボタンを押します。</li>
-      <li>「英検3級」「英検準2級」「英検2級」「英検準1級」のフォルダと「${DATA_NAME}」が入っている<b>「過去問」フォルダ</b>を選びます。</li>
-      <li>「ファイルを表示しますか」「アップロードしますか」と聞かれたら許可してください（パソコンの中で読むだけで、送信はしません）。</li>
-    </ol>
-    <div class="row">
-      ${saved?`<button class="btn primary" id="reuse">前回のフォルダ（${esc(saved.name)}）を使う</button>`:""}
-      <button class="btn ${saved?"":"primary"}" id="pick">過去問フォルダを選ぶ</button>
-      <input type="file" id="dirIn" webkitdirectory directory multiple hidden>
-    </div>
-    <p class="note">Chrome または Edge での利用をおすすめします（2回目からフォルダを覚えておけます）。</p>
+    ${IOS?padWay+pcWay:pcWay+padWay}
+    <p class="note">パソコンでは Chrome または Edge での利用をおすすめします（2回目からフォルダを覚えておけます）。iPadは Safari で使えます。</p>
   </section>`;
-  const fail=e=>setup(e&&e.message==="nodata"?`選んだフォルダに「${DATA_NAME}」が見つかりません。「過去問」フォルダを選んでください。`:"フォルダを読み込めませんでした。もう一度選んでください。");
+  const fail=e=>{const k=e&&e.message;setup(k==="nodata"?`選んだフォルダに「${DATA_NAME}」が見つかりません。「過去問」フォルダを選んでください。`:k==="nofolder"?"フォルダではなくファイルが選ばれました。このiPadではフォルダごと選べないため、「1回分ずつ読み込む」方法を使ってください。":k==="baddata"||e instanceof SyntaxError?`選んだファイルは「${DATA_NAME}」ではないようです。`:k==="empty"?"ファイルが選ばれませんでした。もう一度選んでください。":"読み込めませんでした。もう一度選んでください。"+(IOS?"Google Driveの場合は、ファイルのダウンロードが終わるまで少し待ってから選び直してください。":""))};
   const ok=()=>{S.screen="home";render()};
   if(saved)$("#reuse").onclick=async()=>{try{if((await saved.requestPermission({mode:"read"}))!=="granted")return setup("フォルダの読み取りが許可されませんでした。");await useHandle(saved);ok()}catch(e){fail(e)}};
   $("#pick").onclick=async()=>{
@@ -387,9 +423,28 @@ async function setup(msg){
       try{const h=await window.showDirectoryPicker({id:"kakomon",mode:"read"});await useHandle(h);idb("put",h);ok()}catch(e){if(e&&e.name==="AbortError")return;fail(e)}
     }else $("#dirIn").click();
   };
-  $("#dirIn").onchange=async e=>{try{await useFileList([...e.target.files]);ok()}catch(err){fail(err)}};
+  $("#dirIn").onchange=async e=>{const fs=[...e.target.files];e.target.value="";if(!fs.length)return;
+    main.querySelector("#pick").textContent="読み込み中…";try{await useFileList(fs);ok()}catch(err){fail(err)}};
+  $("#pickData").onclick=()=>$("#dataIn").click();
+  $("#dataIn").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(!f)return;
+    $("#pickData").textContent="読み込み中…";
+    try{const t=await f.text();await useDataText(t);await fdb(st=>st.put(t,"data"));FS.audKeys=new Set(((await fdb(st=>st.getAllKeys(),"readonly"))||[]).filter(k=>String(k).startsWith("aud:")).map(k=>k.slice(4)));ok()}catch(err){fail(err)}};
 }
-
+// 1回分の音源を選んで読み込む（iPad向け）
+async function pickAudio(files){
+  const g=G(),need=needFiles(g),m=new Map(),st=$("#audst");
+  for(const f of files){const n=nfc(f.name);if(need.has(n))m.set(n,f)}
+  // 別の回のフォルダを選んでいないか（フォルダ名が分かる場合だけ確認）
+  const rel=files.map(f=>nfc(f.webkitRelativePath||"")).find(Boolean)||"";const mm=rel.match(/(\d{4}年度 第\d回)/);
+  if(mm&&mm[1]!==nfc(g.title))return st.innerHTML=`<b style="color:var(--ng)">選んだのは「${esc(mm[1])}」の音源です。</b>「${esc(g.title)}」の音源フォルダを選んでください。`;
+  if(m.size<need.size*0.9)return st.innerHTML=`<b style="color:var(--ng)">この回の音源が見つかりません（${m.size} / ${need.size}ファイル）。</b>「${esc(g.title)}」の中の「音源」フォルダを選んでください。`;
+  st.textContent="保存中…";
+  const obj={};let n=0;
+  for(const [k,f] of m){obj[k]=new Blob([await f.arrayBuffer()],{type:"audio/mpeg"});n++;if(n%5===0)st.textContent=`保存中… ${n} / ${m.size}`}
+  FS.aud[g.id]=new Map(Object.entries(obj));FS.urls={};
+  const saved=await fdb(s=>s.put(obj,"aud:"+g.id));if(saved)FS.audKeys.add(g.id);
+  home();if(!saved){const a=$("#audst");if(a)a.innerHTML+="（この端末に保存できなかったため、次回はもう一度選んでください）"}
+}
 /* ===================== 音源プレーヤー ===================== */
 const AU=new Audio();AU.preload="auto";
 let auTick=null;
@@ -553,7 +608,7 @@ let audioOK=null;
 function checkAudio(){
   audioOK=null;const a=new Audio();a.preload="metadata";
   a.onloadedmetadata=()=>{audioOK=true;const m=$("#amsg");if(m)m.innerHTML="音源ファイルを読み込めました。"};
-  a.onerror=()=>{audioOK=false;const m=$("#amsg");if(m)m.innerHTML=FS.mode==="url"?`<b style="color:var(--ng)">音源ファイルが見つかりません。</b>このHTMLファイルを「過去問」フォルダ（英検3級〜英検準1級のフォルダがある場所）に置いて開いてください。`:`<b style="color:var(--ng)">音源ファイルが見つかりません。</b>選んだフォルダの中に、この級の音源フォルダがあるか確認してください。`};
+  a.onerror=()=>{audioOK=false;const m=$("#amsg");if(m)m.innerHTML=FS.mode==="url"?`<b style="color:var(--ng)">音源ファイルが見つかりません。</b>このHTMLファイルを「過去問」フォルダ（英検3級〜英検準1級のフォルダがある場所）に置いて開いてください。`:FS.mode==="files"?(FS.aud[G().id]||FS.audKeys.has(G().id)?`<b style="color:var(--ng)">音源を再生できません。</b>「音源フォルダを選ぶ」から選び直してください。`:"この回の音源をまだ読み込んでいません（上の「音源フォルダを選ぶ」）。"):`<b style="color:var(--ng)">音源ファイルが見つかりません。</b>選んだフォルダの中に、この級の音源フォルダがあるか確認してください。`};
   urlFor(G().speak.model).then(u=>a.src=u).catch(()=>a.onerror());
 }
 function home(){
@@ -579,9 +634,13 @@ function home(){
       ${timeSel?`<label class="f" for="md">制限時間
         <select id="md"><option value="full"${S.mode==="full"?" selected":""}>本番と同じ：${limitMin()}分${S.scope==="all"?"":"（本番の配分の目安）"}</option><option value="free"${S.mode==="free"?" selected":""}>時間制限なし（経過時間を表示）</option></select></label>`:""}
     </div>
+    ${FS.mode==="files"?`<div class="miccheck"><b>この回（${g.title}）の音源</b><span id="audst" style="font-size:13px">${FS.aud[g.id]||FS.audKeys.has(g.id)?"読み込み済みです。":"まだ読み込まれていません。スピーキング・リスニングの前に、この回の「音源」フォルダを選んでください。"}</span>
+      <div class="row"><button class="btn sm ${FS.aud[g.id]||FS.audKeys.has(g.id)?"":"primary"}" id="audDir">音源フォルダを選ぶ</button><button class="btn sm" id="audFiles">音源ファイルをまとめて選ぶ</button>
+      <input type="file" id="audDirIn" webkitdirectory multiple hidden><input type="file" id="audFilesIn" accept="audio/*,.mp3" multiple hidden></div>
+      <span class="muted" style="font-size:12px">場所の例：過去問 ＞ ${esc(g.base.split("/").slice(0,-1).join(" ＞ "))} ＞ 音源</span></div>`:""}
     <div class="stack" style="gap:8px" ${S.scope==="read"||S.scope==="write"?"hidden":""}><b>音量の確認</b>
       <div class="row"><button class="btn" id="check">テスト音声を再生</button><span class="muted" id="amsg" style="font-size:13px">確認中…</span></div></div>
-    ${FS.mode!=="url"?`<p class="muted" style="font-size:13px">読み込んだフォルダ：${esc(FS.name)}　<button class="btn sm" id="repick">フォルダを選び直す</button></p>`:""}
+    ${FS.mode!=="url"?`<p class="muted" style="font-size:13px">${FS.mode==="files"?"問題データ：読み込み済み":"読み込んだフォルダ："+esc(FS.name)}　<button class="btn sm" id="repick">${FS.mode==="files"?"読み込み方法を変える":"フォルダを選び直す"}</button></p>`:""}
     <p class="note">出典：${g.src}　${g.title}。${g.key==="3"?"3級のライティングは2024年度から加わったEメール問題（英検協会の公表例）を含めています。":""}</p>
     <p class="note" ${S.scope==="all"||S.scope==="speak"?"":"hidden"}>スピーキングは本番と同じく、マイクが赤くなっている間の声を録音します。録音は結果画面と「録音の振り返り」で聞き直せます（このブラウザの中だけに保存）。試験中は右上の「中止」でいつでも一時停止・中止できます。</p>
     <div class="row"><button class="btn primary" id="start">${g.label}（${g.title}）${S.scope==="all"?"の試験":"・"+SCOPES.find(x=>x[0]===S.scope)[1]}を開始する</button><button class="btn" id="recsBtn">録音の振り返り</button></div>
@@ -596,6 +655,10 @@ function home(){
   $("#recsBtn").onclick=()=>{stopAudio();go("recs")};
   recAll().then(a=>{const b=$("#recsBtn");if(b&&a.length)b.textContent=`録音の振り返り（${a.length}回分）`});
   if($("#repick"))$("#repick").onclick=()=>{stopAudio();EX=null;setup()};
+  if($("#audDir")){
+    $("#audDir").onclick=()=>$("#audDirIn").click();$("#audFiles").onclick=()=>$("#audFilesIn").click();
+    for(const id of ["#audDirIn","#audFilesIn"])$(id).onchange=e=>{const fs=[...e.target.files];e.target.value="";if(fs.length)pickAudio(fs).catch(()=>{const a=$("#audst");if(a)a.innerHTML=`<b style="color:var(--ng)">読み込めませんでした。</b>Google Driveの場合は、ダウンロードが終わるまで少し待ってから選び直してください。`})};
+  }
   checkAudio();
 }
 
@@ -905,7 +968,12 @@ async function setupAI(){
     }catch(e){if(e&&e.code==="not_granted"){$("#aibox").innerHTML="";return}b.disabled=false;b.textContent="もう一度試す"}
   };
 }
-if(EX)render();else setup();
+(async()=>{
+  if(EX)return render();
+  const t=await fdb(st=>st.get("data"),"readonly");
+  if(t&&!(window.showDirectoryPicker&&await idb("get"))){try{await useDataText(t);FS.audKeys=new Set(((await fdb(st=>st.getAllKeys(),"readonly"))||[]).filter(k=>String(k).startsWith("aud:")).map(k=>k.slice(4)));return render()}catch(e){}}
+  setup();
+})();
 
 </script>
 </body>
