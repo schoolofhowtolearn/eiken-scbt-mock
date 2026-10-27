@@ -267,6 +267,28 @@ details.inner{margin-top:6px}
 .miccheck{border:1px solid var(--line2);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
 .recs{display:flex;flex-direction:column;gap:10px}
 .recs details summary{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline}
+.verdict{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.verdict>div{background:var(--sunk);padding:10px 14px;display:flex;flex-direction:column;gap:4px}
+.verdict span{font-size:12px;color:var(--muted)}.verdict b{font-size:15px}.verdict b.ok{color:var(--ok)}
+.skgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
+.skc{border:1px solid var(--line2);padding:12px 14px;display:flex;flex-direction:column;gap:8px;background:var(--surface)}
+.skh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.skh span{font-size:12px}
+.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.kpi span{display:block;font-size:11.5px;color:var(--muted)}.kpi b{font-size:22px;font-variant-numeric:tabular-nums}
+.gauge{position:relative;height:10px;background:var(--sunk);border:1px solid var(--line);border-radius:5px}
+.gauge i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--sel)}.gauge i.ok{background:var(--ok)}
+.gauge em{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);transform:translateX(-1px)}
+.judge{margin:0;font-size:13px;font-weight:700}.judge.ok{color:var(--ok)}.judge.ng{color:var(--accent)}
+svg.trend{width:100%;height:auto;display:block}
+svg.trend .grid{stroke:var(--line);stroke-width:1}svg.trend .ax{fill:var(--muted);font-size:10px}
+svg.trend .goal{stroke:var(--ink);stroke-width:1.5;stroke-dasharray:4 3}svg.trend .goalt{fill:var(--ink);font-size:10px;font-weight:700}
+svg.trend .ln{fill:none;stroke:var(--sel);stroke-width:2}
+svg.trend .dot{fill:var(--sel);stroke:var(--surface);stroke-width:2}svg.trend .dot.ok{fill:var(--ok)}
+svg.trend .hit{fill:transparent}svg.trend .pt:hover .dot{r:6}
+.seg{display:flex;flex-wrap:wrap;gap:6px}.seg button{min-height:38px;padding:4px 14px;border:1px solid var(--line2);background:var(--surface);color:var(--ink);font:inherit;font-weight:700;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--sel-soft);border-color:var(--sel)}
+.tblwrap{overflow-x:auto}.rtab{border-collapse:collapse;width:100%;font-size:13px;min-width:640px}
+.rtab th,.rtab td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rtab th{font-size:12px;color:var(--muted);font-weight:700}.rtab td.ok{color:var(--ok);font-weight:700}.rtab small{display:block;font-size:11px;color:var(--muted);font-weight:400}
 .recs .when{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
 
 
@@ -540,6 +562,87 @@ function myRecHTML(i){
 function wireAudios(root){root.querySelectorAll(".myrec audio").forEach(a=>{if(a.dataset.w)return;a.dataset.w="1";
   a.addEventListener("loadedmetadata",function fix(){if(a.duration===Infinity||isNaN(a.duration)){a.currentTime=1e7;a.addEventListener("timeupdate",function t(){a.removeEventListener("timeupdate",t);a.currentTime=0},{once:true})}},{once:true});
   a.addEventListener("play",()=>{stopAudio();document.querySelectorAll(".playing").forEach(x=>x.classList.remove("playing"));document.querySelectorAll(".myrec audio").forEach(o=>{if(o!==a)o.pause()})})})}
+
+/* ===================== 結果の記録と合格ラインの比較 ===================== */
+// 合格基準スコア（CSE）と、英検協会が示す正答率の目安（2級以下は各技能6割程度、準1級は7割程度で多くが合格）
+const PASS={"3":{rate:.6,c1:[1103,1650],c2:[353,550]},p2:{rate:.6,c1:[1322,1800],c2:[406,600]},"2":{rate:.6,c1:[1520,1950],c2:[460,650]},p1:{rate:.7,c1:[1792,2250],c2:[512,750]}};
+const SKL=[["L","リスニング","正答数"],["R","リーディング","正答数"],["W","ライティング","AI添削または自己評価"],["S","スピーキング","自己評価"]];
+const resDB=(fn,mode="readwrite")=>new Promise(res=>{try{const r=indexedDB.open("eiken-scbt-results",1);
+  r.onupgradeneeded=()=>r.result.createObjectStore("results",{keyPath:"id"});
+  r.onsuccess=()=>{try{const tx=r.result.transaction("results",mode);const q=fn(tx.objectStore("results"));tx.oncomplete=()=>res(q&&"result"in q?q.result:true);tx.onerror=()=>res(null)}catch(e){res(null)}};
+  r.onerror=()=>res(null)}catch(e){res(null)}});
+const selfPts=o=>Object.values(o).reduce((a,v)=>a+(v==="ok"?1:v==="mid"?.5:0),0);
+function resultRecord(){
+  const g=G(),sk={},src={};
+  if(inS("listen")&&S.started.listen){const L=g.listen.filter(x=>x.kind!=="pas");sk.L=[g.listen.filter((x,k)=>x.kind!=="pas"&&S.la[k]===x.ans).length,L.length]}
+  if(inS("read")&&S.started.rw)sk.R=[g.read.filter((x,k)=>S.ra[k]===x.ans).length,g.read.length];
+  if(inS("write")&&S.started.rw){if(S.aiW){sk.W=S.aiW;src.W="AI"}else if(Object.keys(S.wself||{}).length){sk.W=[selfPts(S.wself),g.write.length];src.W="自己"}}
+  if(inS("speak")&&S.started.speak&&Object.keys(S.self).length)sk.S=[selfPts(S.self),g.speak.qs.length];
+  return{id:S.aid||Date.now(),at:S.aid||Date.now(),ex:g.id,key:g.key,label:g.label,title:g.title,name:(S.name||"").trim(),scope:S.scope,aborted:!!S.aborted,sk,src};
+}
+function saveResult(){const r=resultRecord();if(!Object.keys(r.sk).length)return;resDB(st=>st.put(r))}
+const pct=v=>Math.round(v*100);
+function trendSVG(pts,goal,label){
+  // 1技能・1系列の推移。点線が合格目安
+  const W=320,H=120,pl=34,pr=50,pt=10,pb=22,n=pts.length;
+  const x=i=>n<2?(pl+W-pr)/2:pl+(W-pl-pr)*i/(n-1),y=v=>pt+(H-pt-pb)*(1-v);
+  const gy=y(goal),line=pts.map((p,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join("");
+  return`<svg class="trend" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}の正答率の推移">
+    ${[0,.5,1].map(t=>`<line x1="${pl}" x2="${W-pr}" y1="${y(t)}" y2="${y(t)}" class="grid"/><text x="${pl-6}" y="${y(t)+4}" class="ax" text-anchor="end">${t*100}%</text>`).join("")}
+    <line x1="${pl}" x2="${W-pr}" y1="${gy}" y2="${gy}" class="goal"/><text x="${W-pr+6}" y="${gy+3.5}" class="goalt">目安${pct(goal)}%</text>
+    ${n>1?`<path d="${line}" class="ln"/>`:""}
+    ${pts.map((p,i)=>`<g class="pt"><circle cx="${x(i)}" cy="${y(p.v)}" r="12" class="hit"/><circle cx="${x(i)}" cy="${y(p.v)}" r="4.5" class="dot ${p.v>=goal?"ok":""}"/><title>${esc(p.t)}：${pct(p.v)}%</title></g>`).join("")}
+    ${n?`<text x="${x(0)}" y="${H-6}" class="ax" text-anchor="${n<2?"middle":"start"}">${esc(pts[0].d)}</text>${n>1?`<text x="${x(n-1)}" y="${H-6}" class="ax" text-anchor="end">${esc(pts[n-1].d)}</text>`:""}`:""}
+  </svg>`;
+}
+async function results(){
+  S.sec=null;head(null);tool(null);chrome();
+  main.innerHTML=`<section class="panel stack"><h1>結果の記録</h1><p class="muted">読み込み中…</p></section>`;
+  const all=((await resDB(st=>st.getAll(),"readonly"))||[]).sort((a,b)=>a.at-b.at);if(S.screen!=="results")return;
+  const keys=ORDER.filter(k=>all.some(r=>r.key===k));
+  if(!keys.includes(S.rg))S.rg=keys.includes(S.grade)?S.grade:keys[0];
+  const names=[...new Set(all.filter(r=>r.key===S.rg).map(r=>r.name||""))].sort();
+  if(S.rn!=null&&S.rn!=="*"&&!names.includes(S.rn))S.rn="*";if(S.rn==null)S.rn="*";
+  const rs=all.filter(r=>r.key===S.rg&&(S.rn==="*"||(r.name||"")===S.rn));
+  const P=PASS[S.rg]||PASS["2"],goal=P.rate,lab=keys.length?EX[exOf(S.rg)[0]]?.label||S.rg:"";
+  const d=t=>{const x=new Date(t);return`${x.getMonth()+1}/${x.getDate()}`};
+  const card=([k,l,how])=>{
+    const pts=rs.filter(r=>r.sk[k]).map(r=>({v:r.sk[k][0]/r.sk[k][1],t:`${dt(r.at)} ${r.title}`,d:d(r.at)}));
+    if(!pts.length)return`<div class="skc"><div class="skh"><b>${l}</b><span class="muted">${how}</span></div><p class="muted" style="font-size:13px;margin:0">まだ記録がありません</p></div>`;
+    const last=pts[pts.length-1].v,rec=pts.slice(-3),avg=rec.reduce((a,p)=>a+p.v,0)/rec.length,best=Math.max(...pts.map(p=>p.v));
+    const ok=avg>=goal;
+    return`<div class="skc"><div class="skh"><b>${l}</b><span class="muted">${how}</span></div>
+      <div class="kpi"><div><span>直近${rec.length}回の平均</span><b>${pct(avg)}%</b></div><div><span>前回</span><b>${pct(last)}%</b></div><div><span>最高</span><b>${pct(best)}%</b></div></div>
+      <div class="gauge" aria-hidden="true"><i style="width:${pct(avg)}%" class="${ok?"ok":""}"></i><em style="left:${pct(goal)}%"></em></div>
+      <p class="judge ${ok?"ok":"ng"}">${ok?"✓ 合格の目安に届いています":`△ 目安まであと${pct(goal)-pct(avg)}ポイント`}</p>
+      ${trendSVG(pts,goal,l)}</div>`};
+  const has=k=>rs.some(r=>r.sk[k]);
+  const avgOf=k=>{const p=rs.filter(r=>r.sk[k]).slice(-3);return p.length?p.reduce((a,r)=>a+r.sk[k][0]/r.sk[k][1],0)/p.length:null};
+  const first=["R","L","W"].map(avgOf),firstDone=first.every(v=>v!=null),firstOk=firstDone&&first.every(v=>v>=goal),sp=avgOf("S");
+  main.innerHTML=`<section class="panel stack">
+    <div class="row"><h1>結果の記録と合格ライン</h1><button class="btn" id="hm3">トップに戻る</button></div>
+    ${keys.length?`<div class="row" style="gap:14px;align-items:flex-end">
+      <div class="stack" style="gap:4px"><span class="muted" style="font-size:13px">級</span><div class="seg">${keys.map(k=>`<button aria-pressed="${S.rg===k}" data-rg="${k}">${EX[exOf(k)[0]]?.label||k}</button>`).join("")}</div></div>
+      <label class="f" style="min-width:180px">受験者<select id="rn"><option value="*">全員</option>${names.map(n=>`<option value="${esc(n)}"${S.rn===n?" selected":""}>${n?esc(n):"（名前なし）"}</option>`).join("")}</select></label></div>
+    <div class="verdict">
+      <div><span>一次試験（リーディング・リスニング・ライティング）</span><b class="${firstOk?"ok":""}">${!firstDone?"3技能そろった記録がまだありません":firstOk?"合格圏（3技能とも目安以上）":"あと一歩（目安に届いていない技能があります）"}</b></div>
+      <div><span>二次試験（スピーキング・自己評価）</span><b class="${sp!=null&&sp>=goal?"ok":""}">${sp==null?"記録がまだありません":sp>=goal?"合格圏（目安以上）":"あと一歩"}</b></div>
+      <div><span>比べている目安</span><b>各技能の正答率 ${pct(goal)}%</b></div>
+    </div>
+    <div class="skgrid">${SKL.map(card).join("")}</div>
+    <p class="note">英検の合否はCSEスコアで判定されます（${lab}の合格基準：一次 ${P.c1[0]} / ${P.c1[1]}点、二次 ${P.c2[0]} / ${P.c2[1]}点）。CSEスコアは問題ごとの難しさを考慮して算出されるため、正答数からは換算できません。ここでは英検協会が示す「2級以下は各技能6割程度、準1級は7割程度の正答率の受験者の多くが合格」を目安に、直近3回の平均と比べています。ライティングはAI添削の点数（ない場合は自己評価）、スピーキングは自己評価（答えられた＝1、一部言えた＝0.5）から計算しています。</p>
+    <details open><summary>これまでの記録（${rs.length}件）</summary><div class="dbody"><div class="tblwrap"><table class="rtab"><thead><tr><th>日時</th><th>受験者</th><th>回</th><th>範囲</th>${SKL.map(([k,l])=>`<th>${l}</th>`).join("")}<th></th></tr></thead><tbody>
+      ${rs.slice().reverse().map(r=>`<tr><td>${dt(r.at)}</td><td>${esc(r.name||"—")}</td><td>${esc(r.title)}</td><td>${r.scope==="all"?"4技能":esc((SCOPES.find(x=>x[0]===r.scope)||[0,""])[1])}${r.aborted?"（中止）":""}</td>
+        ${SKL.map(([k])=>{const v=r.sk[k];return`<td class="${v&&v[0]/v[1]>=goal?"ok":""}">${v?`${pct(v[0]/v[1])}%<small>${Number.isInteger(v[0])?v[0]:v[0].toFixed(1)}/${v[1]}${r.src&&r.src[k]?" "+r.src[k]:""}</small>`:"—"}</td>`}).join("")}
+        <td><button class="btn sm" data-rdel="${r.id}">削除</button></td></tr>`).join("")}</tbody></table></div></div></details>`
+    :`<p>まだ記録がありません。試験を受けて結果画面まで進むと、ここに記録されます。</p>`}
+    <p class="muted" style="font-size:12px">記録はこの端末のブラウザの中だけに保存されます。</p>
+  </section>`;
+  $("#hm3").onclick=()=>go("home");
+  main.querySelectorAll("[data-rg]").forEach(b=>b.onclick=()=>{S.rg=b.dataset.rg;S.rn="*";results()});
+  if($("#rn"))$("#rn").onchange=e=>{S.rn=e.target.value;results()};
+  main.querySelectorAll("[data-rdel]").forEach(b=>b.onclick=async()=>{if(!confirmDel(b))return;await resDB(st=>st.delete(+b.dataset.rdel));results()});
+}
 /* ===================== 録音の振り返り ===================== */
 let recURLs=[];
 async function recs(){
@@ -588,8 +691,8 @@ function chrome(){
 }
 function tool(html){const t=$("#tool");if(!html){t.hidden=true;$("#mainwrap").classList.remove("hasfoot");return}t.hidden=false;$("#toolin").innerHTML=html;$("#mainwrap").classList.add("hasfoot")}
 function go(screen,extra={}){hush();if(!(screen==="speak"||(screen==="intro"&&(extra.sec||S.sec)==="speak")))micOff();Object.assign(S,{screen,cf:false,ov:false},extra);if(["speak","listen","rw"].includes(screen))S.started[screen]=true;render();window.scrollTo(0,0)}
-function render(){chrome();({home,intro,speak,listen,rw,result,recs})[S.screen]()}
-function resetAll(){recReset();Object.assign(S,{la:{},ra:{},rf:{},wf:{},wa:["",""],done:{},started:{},self:{},rep:{},ai:null,end:0,elapsed:0,aborted:false,paused:false,explDone:{}})}
+function render(){chrome();({home,intro,speak,listen,rw,result,recs,results})[S.screen]()}
+function resetAll(){recReset();Object.assign(S,{aid:Date.now(),wself:{},aiW:null,la:{},ra:{},rf:{},wf:{},wa:["",""],done:{},started:{},self:{},rep:{},ai:null,end:0,elapsed:0,aborted:false,paused:false,explDone:{}})}
 
 /* ===================== 一時停止・中止 ===================== */
 function pause(){
@@ -644,7 +747,7 @@ function home(){
     ${FS.mode!=="url"?`<p class="muted" style="font-size:13px">${FS.mode==="files"?"問題データ：読み込み済み":"読み込んだフォルダ："+esc(FS.name)}　<button class="btn sm" id="repick">${FS.mode==="files"?"読み込み方法を変える":"フォルダを選び直す"}</button></p>`:""}
     <p class="note">出典：${g.src}　${g.title}。${g.key==="3"?"3級のライティングは2024年度から加わったEメール問題（英検協会の公表例）を含めています。":""}</p>
     <p class="note" ${S.scope==="all"||S.scope==="speak"?"":"hidden"}>スピーキングは本番と同じく、マイクが赤くなっている間の声を録音します。録音は結果画面と「録音の振り返り」で聞き直せます（このブラウザの中だけに保存）。試験中は右上の「中止」でいつでも一時停止・中止できます。</p>
-    <div class="row"><button class="btn primary" id="start">${g.label}（${g.title}）${S.scope==="all"?"の試験":"・"+SCOPES.find(x=>x[0]===S.scope)[1]}を開始する</button><button class="btn" id="recsBtn">録音の振り返り</button></div>
+    <div class="row"><button class="btn primary" id="start">${g.label}（${g.title}）${S.scope==="all"?"の試験":"・"+SCOPES.find(x=>x[0]===S.scope)[1]}を開始する</button><button class="btn" id="recsBtn">録音の振り返り</button><button class="btn" id="resBtn">結果の記録・合格ライン</button></div>
   </section>`;
   main.querySelectorAll(".gbtn[data-g]").forEach(b=>b.onclick=()=>{S.grade=b.dataset.g;S.ex=exOf(S.grade)[0];home()});
   main.querySelectorAll(".gbtn[data-e]").forEach(b=>b.onclick=()=>{S.ex=b.dataset.e;home()});
@@ -654,6 +757,7 @@ function home(){
   if($("#check"))$("#check").onclick=()=>{play(G().speak.model,{onTime:t=>{if(t>6)stopAudio()},onErr:()=>{$("#amsg").innerHTML=`<b style="color:var(--ng)">再生できませんでした。</b>音源フォルダの場所を確認してください。`}})};
   $("#start").onclick=()=>{stopAudio();resetAll();go("intro",{sec:firstSec()})};
   $("#recsBtn").onclick=()=>{stopAudio();go("recs")};
+  $("#resBtn").onclick=()=>{stopAudio();S.rg=S.grade;go("results")};
   recAll().then(a=>{const b=$("#recsBtn");if(b&&a.length)b.textContent=`録音の振り返り（${a.length}回分）`});
   if($("#repick"))$("#repick").onclick=()=>{stopAudio();EX=null;setup()};
   if($("#audDir")){
@@ -972,12 +1076,15 @@ function result(){
     ${g.write.map((w,k)=>`<div class="rv"><b>${w.label}</b><div class="passage"><p class="en" style="font-size:14px">${w.prompt}</p></div>
       <div class="mine">${S.wa[k].trim()?esc(S.wa[k]):"（未記入）"}</div>
       <span class="wc"><span>語数 <b>${wN[k]}</b> 語（目安 ${w.min}〜${w.max}語）</span></span>
-      <div class="model">解答例：${esc(w.model)}</div></div>`).join("")}
+      <div class="model">解答例：${esc(w.model)}</div>
+      <div class="selfrate wself" data-w="${k}">${[["ok","よく書けた"],["mid","一部書けた"],["ng","書けなかった"]].map(([v,l])=>`<button aria-pressed="${S.wself[k]===v}" data-v="${v}">${l}</button>`).join("")}</div></div>`).join("")}
     <div id="aibox"></div></div></details>`:""}
-  <div class="row"><button class="btn primary" id="again">${g.label}${S.scope==="all"?"":"・"+SCOPES.find(x=>x[0]===S.scope)[1]}をもう一度受験する</button><button class="btn" id="hm">トップに戻る</button></div>`;
-  main.querySelectorAll(".selfrate").forEach(gr=>gr.querySelectorAll("button").forEach(b=>b.onclick=()=>{
+  <div class="row"><button class="btn primary" id="again">${g.label}${S.scope==="all"?"":"・"+SCOPES.find(x=>x[0]===S.scope)[1]}をもう一度受験する</button><button class="btn" id="toRes">これまでの結果と合格ライン</button><button class="btn" id="hm">トップに戻る</button></div>`;
+  main.querySelectorAll(".wself").forEach(gr=>gr.querySelectorAll("button").forEach(b=>b.onclick=()=>{
+    S.wself[gr.dataset.w]=b.dataset.v;gr.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));saveResult()}));
+  main.querySelectorAll(".selfrate:not(.wself)").forEach(gr=>gr.querySelectorAll("button").forEach(b=>b.onclick=()=>{
     S.self[gr.dataset.q]=b.dataset.v;gr.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));
-    const ss=$("#selfsum");if(ss)ss.textContent=`${Object.values(S.self).filter(v=>v==="ok").length} / ${g.speak.qs.length}`;
+    const ss=$("#selfsum");if(ss)ss.textContent=`${Object.values(S.self).filter(v=>v==="ok").length} / ${g.speak.qs.length}`;saveResult();
   }));
   main.querySelectorAll("[data-play]").forEach(b=>b.onclick=()=>{
     if(b.classList.contains("playing")){stopAudio();b.classList.remove("playing");return}
@@ -986,6 +1093,7 @@ function result(){
   });
   $("#again").onclick=()=>{stopAudio();resetAll();go("intro",{sec:firstSec()})};
   if($("#toRecs"))$("#toRecs").onclick=()=>{stopAudio();go("recs")};wireAudios(main);
+  $("#toRes").onclick=()=>{stopAudio();S.rg=g.key;go("results")};saveResult();
   $("#hm").onclick=()=>{stopAudio();resetAll();go("home")};
   setupAI();
 }
@@ -1007,6 +1115,7 @@ async function setupAI(){
       const html=`<div class="ai"><b>AI添削の結果</b>${rs.map(r=>{const sc=r.scores||{};const tot=Object.values(sc).reduce((a,c)=>a+(+c||0),0);
         return `<div class="rv"><b>${esc(r.type||"")}　${tot} / ${esc(r.max??"")}</b><table>${Object.entries(sc).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}</table>${r.good?`<p style="font-size:14px">◎ ${esc(r.good)}</p>`:""}${(r.fix||[]).map(f=>`<p style="font-size:14px">△ ${esc(f)}</p>`).join("")}${r.revised?`<div class="model">${esc(r.revised)}</div>`:""}</div>`}).join("")}<p class="note">AIによる目安の採点です。</p></div>`;
       S.ai=html;if($("#aibox"))$("#aibox").innerHTML=html;
+      const got=rs.reduce((a,r)=>a+Object.values(r.scores||{}).reduce((x,c)=>x+(+c||0),0),0),mx=rs.reduce((a,r)=>a+(+r.max||0),0);if(mx>0){S.aiW=[got,mx];saveResult()}
     }catch(e){if(e&&e.code==="not_granted"){$("#aibox").innerHTML="";return}b.disabled=false;b.textContent="もう一度試す"}
   };
 }
