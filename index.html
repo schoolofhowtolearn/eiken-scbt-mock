@@ -291,6 +291,17 @@ svg.trend .hit{fill:transparent}svg.trend .pt:hover .dot{r:6}
 .rtab th{font-size:12px;color:var(--muted);font-weight:700}.rtab td.ok{color:var(--ok);font-weight:700}.rtab small{display:block;font-size:11px;color:var(--muted);font-weight:400}
 .rtab td.low{color:var(--ng);font-weight:700}.rtab tr.avg td{background:var(--sunk);font-weight:700}.rtab.bd{min-width:480px}
 .weak{margin:0 0 6px;font-size:14px}
+.ovc{position:relative;display:flex;flex-direction:column}.ovc .ov{flex:1;padding-bottom:34px}
+.ov.flg::after{display:none}
+.ov.mk-rev{box-shadow:inset 4px 0 0 var(--accent)}.ov.mk-uns{box-shadow:inset 4px 0 0 var(--ng)}
+.mkb{position:absolute;right:6px;bottom:6px;font:inherit;font-size:12px;font-weight:700;min-height:28px;padding:2px 8px;border:1px dashed var(--line2);background:var(--surface);color:var(--muted);border-radius:3px;cursor:pointer}
+.mkb.rev{border:1px solid var(--accent);background:var(--accent);color:#1b1305}.mkb.uns{border:1px solid var(--ng);background:var(--ng-soft);color:var(--ng)}
+.btn.flag.uns[aria-pressed="true"]{background:var(--ng-soft);border-color:var(--ng);color:var(--ng)}
+.mktag{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:2px;margin-left:4px}
+.mktag.rev{background:var(--accent);color:#1b1305}.mktag.uns{background:var(--ng-soft);color:var(--ng);border:1px solid var(--ng)}
+.mkbar{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:13.5px;padding:8px 12px;background:var(--sunk);border:1px solid var(--line)}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer}.chk input{width:18px;height:18px}
+.dbody.only>.rv:not([data-mk]){display:none}
 .recs .when{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
 
 
@@ -329,7 +340,7 @@ const ORDER=["3","p2","2","p1"];
 const LQ=()=>G().listen.filter(x=>x.kind!=="pas");
 const SECS_ALL=[["speak","スピーキング"],["listen","リスニング"],["rw","リーディング・ライティング"]];
 const SCOPES=[["all","4技能すべて","本番と同じ流れ"],["speak","スピーキングだけ","面接形式"],["listen","リスニングだけ","本番音源"],["read","リーディングだけ","時間を計って解く"],["write","ライティングだけ","キーボード入力"]];
-const S={grade:"3",ex:null,scope:"all",mode:"full",screen:"home",sec:null,i:0,run:0,la:{},ra:{},rf:{},wf:{},wa:["",""],done:{},started:{},self:{},rep:{},name:"",vol:1,ov:false,cf:false,ai:null,end:0,paused:false,pauseAt:0,aborted:false,explDone:{}};
+const S={mk:{},grade:"3",ex:null,scope:"all",mode:"full",screen:"home",sec:null,i:0,run:0,la:{},ra:{},rf:{},wf:{},wa:["",""],done:{},started:{},self:{},rep:{},name:"",vol:1,ov:false,cf:false,ai:null,end:0,paused:false,pauseAt:0,aborted:false,explDone:{}};
 const exOf=g=>Object.keys(EX).filter(id=>EX[id].key===g).sort((a,b)=>EX[b].ord-EX[a].ord);
 const G=()=>{if(!EX[S.ex]||EX[S.ex].key!==S.grade)S.ex=exOf(S.grade)[0];return EX[S.ex]};
 const $=s=>document.querySelector(s);
@@ -725,7 +736,7 @@ function chrome(){
 function tool(html){const t=$("#tool");if(!html){t.hidden=true;$("#mainwrap").classList.remove("hasfoot");return}t.hidden=false;$("#toolin").innerHTML=html;$("#mainwrap").classList.add("hasfoot")}
 function go(screen,extra={}){hush();if(!(screen==="speak"||(screen==="intro"&&(extra.sec||S.sec)==="speak")))micOff();Object.assign(S,{screen,cf:false,ov:false},extra);if(["speak","listen","rw"].includes(screen))S.started[screen]=true;render();window.scrollTo(0,0)}
 function render(){chrome();({home,intro,speak,listen,rw,result,recs,results})[S.screen]()}
-function resetAll(){recReset();Object.assign(S,{aid:Date.now(),wself:{},aiW:null,la:{},ra:{},rf:{},wf:{},wa:["",""],done:{},started:{},self:{},rep:{},ai:null,end:0,elapsed:0,aborted:false,paused:false,explDone:{}})}
+function resetAll(){recReset();Object.assign(S,{mk:{},wself:{},aiW:null,la:{},ra:{},rf:{},wf:{},wa:["",""],done:{},started:{},self:{},rep:{},ai:null,end:0,elapsed:0,aborted:false,paused:false,explDone:{}})}
 
 /* ===================== 一時停止・中止 ===================== */
 function pause(){
@@ -808,7 +819,7 @@ function introLines(){
   const both=S.scope==="all";
   return[S.mode==="free"?"制限時間はありません。経過時間が表示されます。":`制限時間は<b>${both?"リーディングとライティング合わせて":""}${limitMin()}分</b>です。${both?"時間配分は自由です。":""}`,
     ...(S.scope!=="write"?[`リーディングは全${g.read.length}問です。`]:[]),...(S.scope!=="read"?[g.writeDesc]:[]),
-    "「問題一覧」から、どの問題にも移動できます。後で確認したい問題は「見直し」を押すと印がつきます。",
+    "「問題一覧」から、どの問題にも移動できます。後で確認したい問題には「⚑ 見直し」、答えに自信がない問題には「？ 自信なし」の印をつけられます（問題一覧の「＋ 印」でもつけられます）。印は答え合わせのときにも表示されます。",
     ...(S.scope!=="read"?["ライティングはキーボードで入力します。スペルチェック機能はありません。"]:[]),
     "すべて終わったら、問題一覧の「解答を終了する」を押してください。"+(S.mode==="free"?"":"時間になると自動で終了します。")];
 }
@@ -975,7 +986,9 @@ function listen(){
         ${(it.read?Array.from({length:it.n},(_,k)=>null):it.opts).map((o,k)=>`<button class="opt" role="radio" aria-checked="${sel===k}" data-k="${k}"><span class="rd"></span><span class="k">${k+1}</span>${o==null?"":`<span class="t">${esc(o)}</span>`}</button>`).join("")}
       </div>
     </div></div>`;
-  tool(`<span class="msg">解答時間が終わると自動で次の問題に進みます。前の問題には戻れません。</span><div class="grp"><button class="btn primary" id="nx" disabled>次へ</button></div>`);
+  const lk="l"+S.i;
+  tool(`<span class="msg">解答時間が終わると自動で次の問題に進みます。前の問題には戻れません。</span><div class="grp"><button class="btn flag uns" id="lmk" aria-pressed="${S.mk[lk]==="uns"}">？ 自信なし</button><button class="btn primary" id="nx" disabled>次へ</button></div>`);
+  $("#lmk").onclick=()=>{setMk(lk,"uns");$("#lmk").setAttribute("aria-pressed",S.mk[lk]==="uns")};
   main.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{S.la[S.i]=+b.dataset.k;main.querySelectorAll(".opt").forEach(x=>x.setAttribute("aria-checked",x===b))});
   $("#nx").onclick=next;
   const ic=$("#ic"),lb=$("#lbl"),bmi=$("#bmi");let last="";
@@ -992,7 +1005,13 @@ function listen(){
 
 /* ===================== リーディング・ライティング ===================== */
 function answered(n){const x=RW()[n];return x.t==="r"?S.ra[x.k]!=null:wcount(S.wa[x.k])>0}
-function flagged(n){const x=RW()[n];return x.t==="r"?!!S.rf[x.k]:!!S.wf[x.k]}
+// 印：rev＝見直し、uns＝自信なし。キーは r3（リーディング）、w0（ライティング）、l5（リスニング）
+const MK={rev:["⚑","見直し"],uns:["？","自信なし"]};
+const mkKey=n=>{const x=RW()[n];return x.t+x.k};
+function flagged(n){return S.mk[mkKey(n)]==="rev"}
+const mkOf=n=>S.mk[mkKey(n)]||"";
+function setMk(key,v){if(!v||S.mk[key]===v)delete S.mk[key];else S.mk[key]=v}
+const mkTag=key=>S.mk[key]?`<span class="mktag ${S.mk[key]}">${MK[S.mk[key]][0]} ${MK[S.mk[key]][1]}</span>`:"";
 function rwTimer(){
   if(S.mode==="free"){startClock(s=>head(s,"経過時間"));return}
   const left=Math.max(0,Math.ceil((S.end-Date.now())/1000));
@@ -1001,10 +1020,10 @@ function rwTimer(){
 function rw(){
   S.run++;if(S.ov)return overview();
   const R=RW(),x=R[S.i];if(x.t==="r")readQ(x.k);else writeQ(x.k);
-  tool(`<div class="grp"><button class="btn" id="ovb">問題一覧</button><button class="btn flag" id="fl" aria-pressed="${flagged(S.i)}">見直し</button></div>
+  tool(`<div class="grp"><button class="btn" id="ovb">問題一覧</button><button class="btn flag" data-m="rev" aria-pressed="${mkOf(S.i)==="rev"}">⚑ 見直し</button><button class="btn flag uns" data-m="uns" aria-pressed="${mkOf(S.i)==="uns"}">？ 自信なし</button></div>
     <div class="grp"><button class="btn" id="pv" ${S.i===0?"disabled":""}>前へ</button><button class="btn primary" id="nx">${S.i<R.length-1?"次へ":"問題一覧へ"}</button></div>`);
   $("#ovb").onclick=()=>{S.ov=true;rw()};
-  $("#fl").onclick=()=>{const x=RW()[S.i];if(x.t==="r")S.rf[x.k]=!S.rf[x.k];else S.wf[x.k]=!S.wf[x.k];$("#fl").setAttribute("aria-pressed",flagged(S.i))};
+  document.querySelectorAll("#toolin [data-m]").forEach(b=>b.onclick=()=>{setMk(mkKey(S.i),b.dataset.m);document.querySelectorAll("#toolin [data-m]").forEach(x=>x.setAttribute("aria-pressed",mkOf(S.i)===x.dataset.m))});
   $("#pv").onclick=()=>{S.i--;rw();window.scrollTo(0,0)};
   $("#nx").onclick=()=>{if(S.i<R.length-1)S.i++;else S.ov=true;rw();window.scrollTo(0,0)};
   if(!tick)rwTimer();
@@ -1044,16 +1063,22 @@ function writeQ(k){
   ta.oninput=()=>{S.wa[k]=ta.value;upd()};upd();
 }
 function overview(){
-  const R=RW(),un=R.filter((_,n)=>!answered(n)).length,fl=R.filter((_,n)=>flagged(n)).length;
-  const card=n=>{const x=R[n];const lab=x.t==="r"?`大問${G().read[x.k].p}`:`ライティング ${G().write[x.k].label}`;
-    return `<button class="ov ${answered(n)?"ans":""} ${flagged(n)?"flg":""}" data-g="${n}"><b>${x.t==="r"?qno(x.k):`W${x.k+1}`}</b><span>${lab}</span><span class="st">${answered(n)?"解答済み":"未解答"}</span></button>`};
+  const R=RW(),un=R.filter((_,n)=>!answered(n)).length,fl=R.filter((_,n)=>mkOf(n)==="rev").length,us=R.filter((_,n)=>mkOf(n)==="uns").length;
+  const only=!!S.ovOnly;
+  const card=n=>{const x=R[n];const lab=x.t==="r"?`大問${G().read[x.k].p}`:`ライティング ${G().write[x.k].label}`;const m=mkOf(n);
+    if(only&&!m)return"";
+    return `<div class="ovc"><button class="ov ${answered(n)?"ans":""} ${m?"mk-"+m:""}" data-g="${n}"><b>${x.t==="r"?qno(x.k):`W${x.k+1}`}</b><span>${lab}</span><span class="st">${answered(n)?"解答済み":"未解答"}</span></button>
+      <button class="mkb ${m}" data-mk="${n}" aria-label="${x.t==="r"?qno(x.k):`W${x.k+1}`}の印を切り替える（今：${m?MK[m][1]:"なし"}）">${m?`${MK[m][0]} ${MK[m][1]}`:"＋ 印"}</button></div>`};
   main.innerHTML=`<section class="panel stack"><h2>問題一覧</h2>
-    <div class="legend"><span>未解答：${un}問</span><span>見直し：${fl}問</span><span>番号を押すとその問題に移動します</span></div>
+    <div class="legend"><span>未解答：${un}問</span><span>⚑ 見直し：${fl}問</span><span>？ 自信なし：${us}問</span><span>番号を押すとその問題に移動します。右下の「＋ 印」を押すたびに、見直し → 自信なし → なし と切り替わります</span></div>
+    <div class="row"><label class="chk"><input type="checkbox" id="ovOnly" ${only?"checked":""}> 印のある問題だけ表示</label></div>
     ${S.scope!=="write"?`<b style="font-size:14px">リーディング</b><div class="ovgrid">${R.map((x,n)=>x.t==="r"?card(n):"").join("")}</div>`:""}
     ${S.scope!=="read"?`<b style="font-size:14px">ライティング</b><div class="ovgrid">${R.map((x,n)=>x.t==="w"?card(n):"").join("")}</div>`:""}
-    ${S.cf?`<div class="dialog" role="alertdialog" aria-labelledby="cft"><b id="cft">解答を終了しますか？</b><p style="font-size:14px">${un?`未解答の問題が${un}問あります。`:""}${fl?`見直しの印がついた問題が${fl}問あります。`:""}終了すると、この試験には戻れません。</p><div class="row"><button class="btn primary" id="cfY">終了する</button><button class="btn" id="cfN">キャンセル</button></div></div>`:""}
+    ${S.cf?`<div class="dialog" role="alertdialog" aria-labelledby="cft"><b id="cft">解答を終了しますか？</b><p style="font-size:14px">${un?`未解答の問題が${un}問あります。`:""}${fl?`見直しの印がついた問題が${fl}問あります。`:""}${us?`自信なしの印がついた問題が${us}問あります。`:""}終了すると、この試験には戻れません。</p><div class="row"><button class="btn primary" id="cfY">終了する</button><button class="btn" id="cfN">キャンセル</button></div></div>`:""}
   </section>`;
   main.querySelectorAll(".ov").forEach(b=>b.onclick=()=>{S.i=+b.dataset.g;S.ov=false;S.cf=false;rw()});
+  main.querySelectorAll(".mkb").forEach(b=>b.onclick=()=>{const n=+b.dataset.mk,m=mkOf(n);S.mk[mkKey(n)]=m===""?"rev":m==="rev"?"uns":"";if(!S.mk[mkKey(n)])delete S.mk[mkKey(n)];S.run++;overview()});
+  $("#ovOnly").onchange=e=>{S.ovOnly=e.target.checked;S.run++;overview()};
   tool(`<div class="grp"><button class="btn" id="bk">問題に戻る</button></div><div class="grp"><button class="btn primary" id="endb">解答を終了する</button></div>`);
   $("#bk").onclick=()=>{S.ov=false;S.cf=false;rw()};
   $("#endb").onclick=()=>{S.cf=true;rw();$("#cfY").focus()};
@@ -1062,6 +1087,14 @@ function overview(){
 }
 
 /* ===================== 結果 ===================== */
+// 答え合わせの上に、印をつけた問題の数と正解数を出す
+function mkBar(t){
+  const g=G(),arr=t==="l"?g.listen:g.read,ans=t==="l"?S.la:S.ra;
+  const ks=Object.keys(S.mk).filter(k=>k[0]===t).map(k=>+k.slice(1)).filter(k=>arr[k]&&arr[k].kind!=="pas");
+  if(!ks.length)return"";
+  const cnt=m=>{const a=ks.filter(k=>S.mk[t+k]===m);return a.length?`<span>${MK[m][0]} ${MK[m][1]}：${a.length}問（正解 ${a.filter(k=>ans[k]===arr[k].ans).length}問）</span>`:""};
+  return`<div class="mkbar">${cnt("rev")}${cnt("uns")}<label class="chk"><input type="checkbox" class="onlymk"> 印をつけた問題だけ表示</label></div>`;
+}
 const olist=(en,ja,ans)=>`<div class="olist">${en.map((o,j)=>`<div class="${j===ans?"ca":""}">${j+1}. ${esc(o)}${ja&&ja[j]?`<span class="ja">${esc(ja[j])}</span>`:""}</div>`).join("")}</div>`;
 const scrHTML=(scr,lab)=>scr&&scr.length?`<details class="inner"><summary>${lab||"スクリプトと和訳を表示"}</summary><div class="dbody scr">${scr.map(([sp,en,ja])=>`<p>${sp?`<span class="sp">${sp}</span>`:""}${esc(en)}<span class="ja">${esc(ja)}</span></p>`).join("")}</div></details>`:"";
 function result(){
@@ -1093,26 +1126,27 @@ function result(){
       <div class="model">解答例：${esc(q.a)}</div>
       <div class="selfrate" data-q="${k}">${[["ok","答えられた"],["mid","一部言えた"],["ng","言えなかった"]].map(([v,l])=>`<button aria-pressed="${S.self[k]===v}" data-v="${v}">${l}</button>`).join("")}</div></div>`).join("")}
     <p class="note">${g.speak.tip}</p></div></details>`:""}
-  ${inS("listen")?`<details ${S.scope==="listen"?"open":""}><summary>リスニング：答え合わせ（和訳つき）</summary><div class="dbody">
-    ${g.listen.map((it,k)=>it.kind==="pas"?`<div class="rv"><div class="row"><b>第${it.part}部 (${it.label}) 英文</b><button class="btn sm" data-play="${it.f}">英文を聞く</button></div>${scrHTML(it.scr,"英文と和訳を表示")}</div>`:`<div class="rv"><div class="row">${mark(S.la[k]===it.ans)}<b>第${it.part}部 No. ${it.no}</b><span class="muted" style="font-size:13px">あなたの解答：${S.la[k]==null?"未解答":S.la[k]+1}　正解：${it.ans+1}</span><button class="btn sm" data-play="${it.f}">音声を聞く</button></div>
+  ${inS("listen")?`<details ${S.scope==="listen"?"open":""}><summary>リスニング：答え合わせ（和訳つき）</summary><div class="dbody">${mkBar("l")}
+    ${g.listen.map((it,k)=>it.kind==="pas"?`<div class="rv"><div class="row"><b>第${it.part}部 (${it.label}) 英文</b><button class="btn sm" data-play="${it.f}">英文を聞く</button></div>${scrHTML(it.scr,"英文と和訳を表示")}</div>`:`<div class="rv" ${S.mk["l"+k]?`data-mk="${S.mk["l"+k]}"`:""}><div class="row">${mark(S.la[k]===it.ans)}<b>第${it.part}部 No. ${it.no}</b>${mkTag("l"+k)}<span class="muted" style="font-size:13px">あなたの解答：${S.la[k]==null?"未解答":S.la[k]+1}　正解：${it.ans+1}</span><button class="btn sm" data-play="${it.f}">音声を聞く</button></div>
       ${it.situ?`<p class="en" style="font-size:14px"><b>Situation:</b> ${esc(it.situ)}${it.sitj?`<span class="qja">${esc(it.sitj)}</span>`:""}</p>`:""}
       ${it.sq?`<p class="en" style="font-size:14px"><b>Question:</b> ${esc(it.sq)}${it.sqj?`<span class="qja">${esc(it.sqj)}</span>`:""}</p>`:it.qq?`<p class="en" style="font-size:14px"><b>Question:</b> ${esc(it.qq[0])}<span class="qja">${esc(it.qq[1])}</span></p>`:""}
       ${(it.read?it.oe:it.opts)?olist(it.read?it.oe:it.opts,it.oj,it.ans):""}
       ${scrHTML(it.scr)}</div>`).join("")}
   </div></details>`:""}
-  ${inS("read")?`<details ${S.scope==="read"?"open":""}><summary>リーディング：答え合わせ（和訳つき）</summary><div class="dbody">
-    ${g.read.map((it,k)=>`<div class="rv"><div class="row">${mark(S.ra[k]===it.ans)}<b>大問${it.p} ${qno(k)}</b><span class="muted" style="font-size:13px">あなたの解答：${S.ra[k]==null?"未解答":S.ra[k]+1}　正解：${it.ans+1}</span></div>
+  ${inS("read")?`<details ${S.scope==="read"?"open":""}><summary>リーディング：答え合わせ（和訳つき）</summary><div class="dbody">${mkBar("r")}
+    ${g.read.map((it,k)=>`<div class="rv" ${S.mk["r"+k]?`data-mk="${S.mk["r"+k]}"`:""}><div class="row">${mark(S.ra[k]===it.ans)}<b>大問${it.p} ${qno(k)}</b>${mkTag("r"+k)}<span class="muted" style="font-size:13px">あなたの解答：${S.ra[k]==null?"未解答":S.ra[k]+1}　正解：${it.ans+1}</span></div>
       <p class="en" style="font-size:15px">${it.blank?`本文の空所 (${it.blank})`:it.q}${it.qj?`<span class="qja">${it.qj}</span>`:""}</p>${olist(it.o,it.oj,it.ans)}</div>`).join("")}
     <details class="inner"><summary>本文を表示</summary><div class="dbody">${Object.keys(g.pas).map(passageHTML).join("")}</div></details>
   </div></details>`:""}
   ${inS("write")?`<details ${S.started.rw?"open":""}><summary>ライティング：あなたの解答と解答例</summary><div class="dbody">
-    ${g.write.map((w,k)=>`<div class="rv"><b>${w.label}</b><div class="passage"><p class="en" style="font-size:14px">${w.prompt}</p></div>
+    ${g.write.map((w,k)=>`<div class="rv"><b>${w.label}</b>${mkTag("w"+k)}<div class="passage"><p class="en" style="font-size:14px">${w.prompt}</p></div>
       <div class="mine">${S.wa[k].trim()?esc(S.wa[k]):"（未記入）"}</div>
       <span class="wc"><span>語数 <b>${wN[k]}</b> 語（目安 ${w.min}〜${w.max}語）</span></span>
       <div class="model">解答例：${esc(w.model)}</div>
       <div class="selfrate wself" data-w="${k}">${[["ok","よく書けた"],["mid","一部書けた"],["ng","書けなかった"]].map(([v,l])=>`<button aria-pressed="${S.wself[k]===v}" data-v="${v}">${l}</button>`).join("")}</div></div>`).join("")}
     <div id="aibox"></div></div></details>`:""}
   <div class="row"><button class="btn primary" id="again">${g.label}${S.scope==="all"?"":"・"+SCOPES.find(x=>x[0]===S.scope)[1]}をもう一度受験する</button><button class="btn" id="toRes">これまでの結果と合格ライン</button><button class="btn" id="hm">トップに戻る</button></div>`;
+  main.querySelectorAll(".onlymk").forEach(c=>c.onchange=()=>c.closest(".dbody").classList.toggle("only",c.checked));
   main.querySelectorAll(".wself").forEach(gr=>gr.querySelectorAll("button").forEach(b=>b.onclick=()=>{
     S.wself[gr.dataset.w]=b.dataset.v;gr.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));saveResult()}));
   main.querySelectorAll(".selfrate:not(.wself)").forEach(gr=>gr.querySelectorAll("button").forEach(b=>b.onclick=()=>{
