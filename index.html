@@ -289,6 +289,8 @@ svg.trend .hit{fill:transparent}svg.trend .pt:hover .dot{r:6}
 .tblwrap{overflow-x:auto}.rtab{border-collapse:collapse;width:100%;font-size:13px;min-width:640px}
 .rtab th,.rtab td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;white-space:nowrap;font-variant-numeric:tabular-nums}
 .rtab th{font-size:12px;color:var(--muted);font-weight:700}.rtab td.ok{color:var(--ok);font-weight:700}.rtab small{display:block;font-size:11px;color:var(--muted);font-weight:400}
+.rtab td.low{color:var(--ng);font-weight:700}.rtab tr.avg td{background:var(--sunk);font-weight:700}.rtab.bd{min-width:480px}
+.weak{margin:0 0 6px;font-size:14px}
 .recs .when{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
 
 
@@ -578,7 +580,13 @@ function resultRecord(){
   if(inS("read")&&S.started.rw)sk.R=[g.read.filter((x,k)=>S.ra[k]===x.ans).length,g.read.length];
   if(inS("write")&&S.started.rw){if(S.aiW){sk.W=S.aiW;src.W="AI"}else if(Object.keys(S.wself||{}).length){sk.W=[selfPts(S.wself),g.write.length];src.W="自己"}}
   if(inS("speak")&&S.started.speak&&Object.keys(S.self).length)sk.S=[selfPts(S.self),g.speak.qs.length];
-  return{id:S.aid||Date.now(),at:S.aid||Date.now(),ex:g.id,key:g.key,label:g.label,title:g.title,name:(S.name||"").trim(),scope:S.scope,aborted:!!S.aborted,sk,src};
+  // 大問（パート）ごとの正答数
+  const bd={},grp=(arr,key,ans)=>{const m={};arr.forEach((x,k)=>{if(x.kind==="pas")return;const p=String(x[key]).match(/^\d+/)[0];(m[p]=m[p]||[0,0])[1]++;if(ans[k]===x.ans)m[p][0]++});return m};
+  if(sk.L)bd.L=grp(g.listen,"part",S.la);
+  if(sk.R)bd.R=grp(g.read,"p",S.ra);
+  if(sk.W&&src.W==="自己"){bd.W={};g.write.forEach((w,k)=>{if(S.wself[k])bd.W[w.label]=[selfPts({a:S.wself[k]}),1]})}
+  if(sk.S){bd.S={};g.speak.qs.forEach((q,k)=>{if(S.self[k])bd.S["No."+q.n]=[selfPts({a:S.self[k]}),1]})}
+  return{bd,id:S.aid||Date.now(),at:S.aid||Date.now(),ex:g.id,key:g.key,label:g.label,title:g.title,name:(S.name||"").trim(),scope:S.scope,aborted:!!S.aborted,sk,src};
 }
 function saveResult(){const r=resultRecord();if(!Object.keys(r.sk).length)return;resDB(st=>st.put(r))}
 const pct=v=>Math.round(v*100);
@@ -594,6 +602,30 @@ function trendSVG(pts,goal,label){
     ${pts.map((p,i)=>`<g class="pt"><circle cx="${x(i)}" cy="${y(p.v)}" r="12" class="hit"/><circle cx="${x(i)}" cy="${y(p.v)}" r="4.5" class="dot ${p.v>=goal?"ok":""}"/><title>${esc(p.t)}：${pct(p.v)}%</title></g>`).join("")}
     ${n?`<text x="${x(0)}" y="${H-6}" class="ax" text-anchor="${n<2?"middle":"start"}">${esc(pts[0].d)}</text>${n>1?`<text x="${x(n-1)}" y="${H-6}" class="ax" text-anchor="end">${esc(pts[n-1].d)}</text>`:""}`:""}
   </svg>`;
+}
+
+const BDL={L:["リスニング",p=>`第${p}部`],R:["リーディング",p=>`大問${p}`],W:["ライティング（自己評価）",p=>p],S:["スピーキング（自己評価）",p=>p]};
+function bdHTML(rs,goal){
+  const out=[];
+  for(const k of ["L","R","W","S"]){
+    const recs=rs.filter(r=>r.bd&&r.bd[k]&&Object.keys(r.bd[k]).length);if(!recs.length)continue;
+    const [title,nm]=BDL[k];
+    const cols=[...new Set(recs.flatMap(r=>Object.keys(r.bd[k])))];
+    if(k==="L"||k==="R")cols.sort((a,b)=>a-b);
+    const cell=v=>v?`<td class="${v[0]/v[1]>=goal?"ok":v[0]/v[1]<goal-.15?"low":""}">${pct(v[0]/v[1])}%<small>${Number.isInteger(v[0])?v[0]:v[0].toFixed(1)}/${v[1]}</small></td>`:"<td>—</td>";
+    const last3=recs.slice(-3),avg={};
+    cols.forEach(c=>{const v=last3.map(r=>r.bd[k][c]).filter(Boolean);if(v.length)avg[c]=[v.reduce((a,x)=>a+x[0],0),v.reduce((a,x)=>a+x[1],0)]});
+    const weak=cols.filter(c=>avg[c]).sort((a,b)=>avg[a][0]/avg[a][1]-avg[b][0]/avg[b][1])[0];
+    const qn=k==="L"||k==="R";
+    out.push(`<details ${k==="L"||k==="R"?"open":""}><summary>${title}：${k==="L"?"パート":k==="R"?"大問":"問題"}ごとの正答${qn?"数・正答率":"（自己評価）"}</summary><div class="dbody">
+      ${weak&&cols.length>1?`<p class="weak">直近${last3.length}回でいちばん低いのは <b>${esc(nm(weak))}</b>（${pct(avg[weak][0]/avg[weak][1])}%）です。</p>`:""}
+      <div class="tblwrap"><table class="rtab bd"><thead><tr><th>日時</th><th>受験者</th><th>回</th>${cols.map(c=>`<th>${esc(nm(c))}</th>`).join("")}</tr></thead><tbody>
+      <tr class="avg"><td colspan="3">直近${last3.length}回の合計</td>${cols.map(c=>cell(avg[c])).join("")}</tr>
+      ${recs.slice().reverse().map(r=>`<tr><td>${dt(r.at)}</td><td>${esc(r.name||"—")}</td><td>${esc(r.title)}</td>${cols.map(c=>cell(r.bd[k][c])).join("")}</tr>`).join("")}
+      </tbody></table></div></div></details>`);
+  }
+  if(!out.length)return"";
+  return out.join("")+`<p class="muted" style="font-size:12px;margin-top:-4px">緑は目安（${pct(goal)}%）以上、赤は目安より15ポイント以上低い大問です。大問ごとの記録は、この機能を追加した後に受けた試験から残ります。</p>`;
 }
 async function results(){
   S.sec=null;head(null);tool(null);chrome();
@@ -631,6 +663,7 @@ async function results(){
     </div>
     <div class="skgrid">${SKL.map(card).join("")}</div>
     <p class="note">英検の合否はCSEスコアで判定されます（${lab}の合格基準：一次 ${P.c1[0]} / ${P.c1[1]}点、二次 ${P.c2[0]} / ${P.c2[1]}点）。CSEスコアは問題ごとの難しさを考慮して算出されるため、正答数からは換算できません。ここでは英検協会が示す「2級以下は各技能6割程度、準1級は7割程度の正答率の受験者の多くが合格」を目安に、直近3回の平均と比べています。ライティングはAI添削の点数（ない場合は自己評価）、スピーキングは自己評価（答えられた＝1、一部言えた＝0.5）から計算しています。</p>
+    ${bdHTML(rs,goal)}
     <details open><summary>これまでの記録（${rs.length}件）</summary><div class="dbody"><div class="tblwrap"><table class="rtab"><thead><tr><th>日時</th><th>受験者</th><th>回</th><th>範囲</th>${SKL.map(([k,l])=>`<th>${l}</th>`).join("")}<th></th></tr></thead><tbody>
       ${rs.slice().reverse().map(r=>`<tr><td>${dt(r.at)}</td><td>${esc(r.name||"—")}</td><td>${esc(r.title)}</td><td>${r.scope==="all"?"4技能":esc((SCOPES.find(x=>x[0]===r.scope)||[0,""])[1])}${r.aborted?"（中止）":""}</td>
         ${SKL.map(([k])=>{const v=r.sk[k];return`<td class="${v&&v[0]/v[1]>=goal?"ok":""}">${v?`${pct(v[0]/v[1])}%<small>${Number.isInteger(v[0])?v[0]:v[0].toFixed(1)}/${v[1]}${r.src&&r.src[k]?" "+r.src[k]:""}</small>`:"—"}</td>`}).join("")}
