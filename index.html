@@ -302,6 +302,12 @@ svg.trend .hit{fill:transparent}svg.trend .pt:hover .dot{r:6}
 .mkbar{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:13.5px;padding:8px 12px;background:var(--sunk);border:1px solid var(--line)}
 .chk{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer}.chk input{width:18px;height:18px}
 .dbody.only>.rv:not([data-mk]){display:none}
+.delbar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-bottom:8px}
+.rtab input[type=checkbox]{width:18px;height:18px}.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.resume{border:2px solid var(--accent);background:var(--sunk);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.resrow{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px 14px;border-top:1px solid var(--line);padding-top:8px}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--surface);padding:10px 18px;border-radius:4px;font-size:14px;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:100;max-width:calc(100% - 32px)}
+.toast.on{opacity:1;transform:translateX(-50%)}
 .recs .when{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
 
 
@@ -599,7 +605,7 @@ function resultRecord(){
   if(sk.S){bd.S={};g.speak.qs.forEach((q,k)=>{if(S.self[k])bd.S["No."+q.n]=[selfPts({a:S.self[k]}),1]})}
   return{bd,id:S.aid||Date.now(),at:S.aid||Date.now(),ex:g.id,key:g.key,label:g.label,title:g.title,name:(S.name||"").trim(),scope:S.scope,aborted:!!S.aborted,sk,src};
 }
-function saveResult(){const r=resultRecord();if(!Object.keys(r.sk).length)return;resDB(st=>st.put(r))}
+function saveResult(){if(S.noSave)return;const r=resultRecord();if(!Object.keys(r.sk).length)return;resDB(st=>st.put(r))}
 const pct=v=>Math.round(v*100);
 function trendSVG(pts,goal,label){
   // 1技能・1系列の推移。点線が合格目安
@@ -675,8 +681,11 @@ async function results(){
     <div class="skgrid">${SKL.map(card).join("")}</div>
     <p class="note">英検の合否はCSEスコアで判定されます（${lab}の合格基準：一次 ${P.c1[0]} / ${P.c1[1]}点、二次 ${P.c2[0]} / ${P.c2[1]}点）。CSEスコアは問題ごとの難しさを考慮して算出されるため、正答数からは換算できません。ここでは英検協会が示す「2級以下は各技能6割程度、準1級は7割程度の正答率の受験者の多くが合格」を目安に、直近3回の平均と比べています。ライティングはAI添削の点数（ない場合は自己評価）、スピーキングは自己評価（答えられた＝1、一部言えた＝0.5）から計算しています。</p>
     ${bdHTML(rs,goal)}
-    <details open><summary>これまでの記録（${rs.length}件）</summary><div class="dbody"><div class="tblwrap"><table class="rtab"><thead><tr><th>日時</th><th>受験者</th><th>回</th><th>範囲</th>${SKL.map(([k,l])=>`<th>${l}</th>`).join("")}<th></th></tr></thead><tbody>
-      ${rs.slice().reverse().map(r=>`<tr><td>${dt(r.at)}</td><td>${esc(r.name||"—")}</td><td>${esc(r.title)}</td><td>${r.scope==="all"?"4技能":esc((SCOPES.find(x=>x[0]===r.scope)||[0,""])[1])}${r.aborted?"（中止）":""}</td>
+    <details open><summary>これまでの記録（${rs.length}件）</summary><div class="dbody">
+      <div class="delbar"><label class="chk"><input type="checkbox" id="selAll"> すべて選ぶ</label><span class="muted" id="selN" style="font-size:13px">0件選択中</span>
+        <button class="btn sm warn" id="delSel" disabled>選んだ記録を削除</button><button class="btn sm" id="delShown">表示中の${rs.length}件をすべて削除</button></div>
+      <div class="tblwrap"><table class="rtab"><thead><tr><th><span class="vh">選択</span></th><th>日時</th><th>受験者</th><th>回</th><th>範囲</th>${SKL.map(([k,l])=>`<th>${l}</th>`).join("")}<th></th></tr></thead><tbody>
+      ${rs.slice().reverse().map(r=>`<tr><td><input type="checkbox" class="rsel" value="${r.id}" aria-label="${dt(r.at)}の記録を選ぶ"></td><td>${dt(r.at)}</td><td>${esc(r.name||"—")}</td><td>${esc(r.title)}</td><td>${r.scope==="all"?"4技能":esc((SCOPES.find(x=>x[0]===r.scope)||[0,""])[1])}${r.aborted?"（中止）":""}</td>
         ${SKL.map(([k])=>{const v=r.sk[k];return`<td class="${v&&v[0]/v[1]>=goal?"ok":""}">${v?`${pct(v[0]/v[1])}%<small>${Number.isInteger(v[0])?v[0]:v[0].toFixed(1)}/${v[1]}${r.src&&r.src[k]?" "+r.src[k]:""}</small>`:"—"}</td>`}).join("")}
         <td><button class="btn sm" data-rdel="${r.id}">削除</button></td></tr>`).join("")}</tbody></table></div></div></details>`
     :`<p>まだ記録がありません。試験を受けて結果画面まで進むと、ここに記録されます。</p>`}
@@ -686,6 +695,12 @@ async function results(){
   main.querySelectorAll("[data-rg]").forEach(b=>b.onclick=()=>{S.rg=b.dataset.rg;S.rn="*";results()});
   if($("#rn"))$("#rn").onchange=e=>{S.rn=e.target.value;results()};
   main.querySelectorAll("[data-rdel]").forEach(b=>b.onclick=async()=>{if(!confirmDel(b))return;await resDB(st=>st.delete(+b.dataset.rdel));results()});
+  const sels=()=>[...main.querySelectorAll(".rsel:checked")].map(c=>+c.value),upd=()=>{const n=sels().length;if($("#selN"))$("#selN").textContent=`${n}件選択中`;if($("#delSel")){$("#delSel").disabled=!n;$("#delSel").textContent=n?`選んだ${n}件を削除`:"選んだ記録を削除";delete $("#delSel").dataset.armed}};
+  main.querySelectorAll(".rsel").forEach(c=>c.onchange=upd);
+  if($("#selAll"))$("#selAll").onchange=e=>{main.querySelectorAll(".rsel").forEach(c=>c.checked=e.target.checked);upd()};
+  const delMany=async ids=>{await resDB(st=>ids.forEach(id=>st.delete(id)));results()};
+  if($("#delSel"))$("#delSel").onclick=()=>{const b=$("#delSel");if(!confirmDel(b))return;delMany(sels())};
+  if($("#delShown"))$("#delShown").onclick=()=>{const b=$("#delShown");if(!confirmDel(b))return;delMany(rs.map(r=>r.id))};
 }
 /* ===================== 録音の振り返り ===================== */
 let recURLs=[];
@@ -734,21 +749,73 @@ function chrome(){
   $("#abortBtn").hidden=!S.sec;
 }
 function tool(html){const t=$("#tool");if(!html){t.hidden=true;$("#mainwrap").classList.remove("hasfoot");return}t.hidden=false;$("#toolin").innerHTML=html;$("#mainwrap").classList.add("hasfoot")}
-function go(screen,extra={}){hush();if(!(screen==="speak"||(screen==="intro"&&(extra.sec||S.sec)==="speak")))micOff();Object.assign(S,{screen,cf:false,ov:false},extra);if(["speak","listen","rw"].includes(screen))S.started[screen]=true;render();window.scrollTo(0,0)}
+function go(screen,extra={}){hush();if(!(screen==="speak"||(screen==="intro"&&(extra.sec||S.sec)==="speak")))micOff();Object.assign(S,{screen,cf:false,ov:false},extra);if(["speak","listen","rw"].includes(screen))S.started[screen]=true;if(screen==="result")dropProgress(S.aid);render();window.scrollTo(0,0);saveProgress()}
 function render(){chrome();({home,intro,speak,listen,rw,result,recs,results})[S.screen]()}
-function resetAll(){recReset();Object.assign(S,{mk:{},wself:{},aiW:null,la:{},ra:{},rf:{},wf:{},wa:["",""],done:{},started:{},self:{},rep:{},ai:null,end:0,elapsed:0,aborted:false,paused:false,explDone:{}})}
+function resetAll(){recReset();Object.assign(S,{aid:Date.now(),noSave:false,mk:{},wself:{},aiW:null,la:{},ra:{},rf:{},wf:{},wa:["",""],done:{},started:{},self:{},rep:{},ai:null,end:0,elapsed:0,aborted:false,paused:false,explDone:{}})}
 
+
+/* ===================== 一時保存（途中から再開） ===================== */
+// 解答の途中経過をこのブラウザに保存する。受験ごと（S.aid）に1件、最大10件
+const PG_KEY="eiken-scbt-progress";
+const pgAll=()=>{try{return JSON.parse(localStorage.getItem(PG_KEY)||"{}")||{}}catch(e){return{}}};
+const pgPut=o=>{try{localStorage.setItem(PG_KEY,JSON.stringify(o));return true}catch(e){return false}};
+function pgCan(){return !!S.sec&&!!S.aid&&Object.values(S.started||{}).some(Boolean)&&["speak","listen","rw","intro"].includes(S.screen)}
+function saveProgress(){
+  if(!pgCan())return false;
+  const left=S.mode==="free"||!S.end?null:Math.max(0,S.end-(S.paused?S.pauseAt:Date.now()));
+  const p={v:1,at:Date.now(),aid:S.aid,ex:G().id,grade:S.grade,scope:S.scope,mode:S.mode,name:S.name,sec:S.sec,screen:S.screen==="intro"?"intro":S.sec,i:S.i,
+    la:S.la,ra:S.ra,wa:S.wa,mk:S.mk,done:S.done,started:S.started,self:S.self,rep:S.rep,wself:S.wself,explDone:S.explDone,left,elapsed:S.elapsed||0,recSid:REC.sid||0};
+  const all=pgAll();all[S.aid]=p;
+  const ks=Object.keys(all).sort((a,b)=>all[b].at-all[a].at);ks.slice(10).forEach(k=>delete all[k]);
+  return pgPut(all);
+}
+function dropProgress(aid){const all=pgAll();if(all[aid]){delete all[aid];pgPut(all)}}
+setInterval(()=>{if(!S.paused)saveProgress()},5000);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")saveProgress()});
+window.addEventListener("pagehide",saveProgress);
+const secName=k=>({speak:"スピーキング",listen:"リスニング",rw:"リーディング・ライティング"})[k]||"";
+function pgDesc(p){
+  const g=EX[p.ex];if(!g)return"";
+  const where=p.screen==="intro"?`${secName(p.sec)}の開始前`:p.sec==="rw"?`${secName(p.sec)}（問題${p.i+1}）`:p.sec==="listen"?`リスニング No.${(g.listen.filter(x=>x.kind!=="pas").indexOf(g.listen[p.i])+1)||p.i+1}`:`スピーキング ${p.i===0?"音読・ナレーション":"No."+p.i}`;
+  const ans=Object.keys(p.la||{}).length+Object.keys(p.ra||{}).length+(p.wa||[]).filter(t=>t&&t.trim()).length;
+  return`${where}　解答済み ${ans}問${p.left!=null&&p.sec==="rw"?`　残り時間 ${fmt(Math.round(p.left/1000))}`:""}`;
+}
+async function resumeProgress(aid){
+  const p=pgAll()[aid];if(!p||!EX[p.ex])return;
+  stopAudio();resetAll();
+  Object.assign(S,{aid:p.aid,grade:p.grade,ex:p.ex,scope:p.scope,mode:p.mode,name:p.name||"",la:p.la||{},ra:p.ra||{},wa:p.wa||["",""],mk:p.mk||{},done:p.done||{},
+    started:p.started||{},self:p.self||{},rep:p.rep||{},wself:p.wself||{},explDone:p.explDone||{},elapsed:p.elapsed||0,paused:false});
+  S.end=p.left!=null?Date.now()+p.left:0;
+  // それまでの録音を読み戻す
+  if(p.recSid){const r=await recDB(st=>st.get(p.recSid));REC.sid=p.recSid;if(r&&r.items)for(const [k,x] of Object.entries(r.items))REC.items[k]={blob:x.blob,url:URL.createObjectURL(x.blob),secs:x.secs}}
+  if(p.screen==="intro")return go("intro",{sec:p.sec});
+  if(p.sec==="speak")await micOn();
+  go(p.sec,{sec:p.sec,i:p.i});
+}
+function pgToast(t){let el=$("#pgToast");if(!el){el=document.createElement("div");el.id="pgToast";el.className="toast";el.setAttribute("role","status");document.body.appendChild(el)}
+  el.textContent=t;el.classList.add("on");clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove("on"),2200)}
+function pgHomeHTML(){
+  const all=pgAll(),ks=Object.keys(all).filter(k=>EX[all[k].ex]).sort((a,b)=>all[b].at-all[a].at);
+  if(!ks.length)return"";
+  return`<div class="resume"><b>途中で保存した試験があります</b>
+    ${ks.map(k=>{const p=all[k],g=EX[p.ex];return`<div class="resrow"><div><b>${esc(g.label)}　${esc(g.title)}　${p.scope==="all"?"4技能":esc((SCOPES.find(x=>x[0]===p.scope)||[0,""])[1])}</b>${p.name?`　<span>${esc(p.name)}</span>`:""}
+      <div class="muted" style="font-size:12.5px">${dt(p.at)} に保存　${esc(pgDesc(p))}</div></div>
+      <div class="row" style="gap:6px"><button class="btn primary sm" data-resume="${k}">続きから再開</button><button class="btn sm" data-pgdel="${k}">破棄</button></div></div>`}).join("")}</div>`;
+}
 /* ===================== 一時停止・中止 ===================== */
 function pause(){
   if(S.paused||!S.sec)return;S.paused=true;S.pauseAt=Date.now();hush();
   const live=S.screen==="speak"||S.screen==="listen";
-  $("#dlgP").innerHTML=(S.screen==="rw"?"制限時間は止まっています。":"")+(live?"再開すると、いまの問題の音声を最初から流し直します。":"")+"中止する場合は、ここまでの結果を見るか、トップに戻るかを選んでください。";
+  $("#dlgP").innerHTML=(S.screen==="rw"?"制限時間は止まっています。":"")+(live?"再開すると、いまの問題の音声を最初から流し直します。":"")+"続きを後でやる場合は「一時保存してトップに戻る」を押してください。トップ画面の「続きから再開」で、この問題から再開できます。";
+  saveProgress();
   $("#ovl").hidden=false;$("#dResume").focus();
 }
 function resume(){if(!S.paused)return;if(S.screen==="rw"&&S.end)S.end+=Date.now()-S.pauseAt;S.paused=false;$("#ovl").hidden=true;render()}
 $("#abortBtn").onclick=pause;$("#dResume").onclick=resume;
 $("#dResult").onclick=()=>{S.paused=false;$("#ovl").hidden=true;S.aborted=true;go("result")};
-$("#dHome").onclick=()=>{S.paused=false;$("#ovl").hidden=true;resetAll();go("home")};
+$("#dHome").onclick=()=>{S.paused=false;$("#ovl").hidden=true;dropProgress(S.aid);resetAll();go("home")};
+{const b=document.createElement("button");b.className="btn";b.id="dSave";b.textContent="一時保存してトップに戻る（あとで続きから再開）";$("#dResult").before(b);
+  b.onclick=()=>{const ok=saveProgress();S.paused=false;$("#ovl").hidden=true;S.sec=null;resetAll();go("home");pgToast(ok?"一時保存しました。「続きから再開」で再開できます。":"保存できませんでした（このブラウザでは保存が使えません）")}}
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.paused)resume()});
 
 /* ===================== ホーム ===================== */
@@ -766,6 +833,7 @@ function home(){
   main.innerHTML=`<section class="panel stack">
     <h1>英検S-CBT 模擬試験（過去問・本番音源）</h1>
     <p>実際の過去問と本番の音源を使い、英検S-CBTと同じ画面の進み方で受験できます。4技能を通して受けるほか、技能ごとの練習もできます。</p>
+    ${pgHomeHTML()}
     <div class="stack" style="gap:6px"><span class="muted" style="font-size:13px" id="glab">受験する級</span>
       <div class="grades" role="radiogroup" aria-labelledby="glab">${ORDER.filter(k=>exOf(k).length).map(k=>{const v=EX[exOf(k)[0]];return `<button class="gbtn" role="radio" aria-checked="${S.grade===k}" data-g="${k}"><b>${v.label}</b><span>${exOf(k).length}回分</span></button>`}).join("")}</div></div>
     <div class="stack" style="gap:6px"><span class="muted" style="font-size:13px" id="elab">年度・回</span>
@@ -801,6 +869,8 @@ function home(){
   if($("#check"))$("#check").onclick=()=>{play(G().speak.model,{onTime:t=>{if(t>6)stopAudio()},onErr:()=>{$("#amsg").innerHTML=`<b style="color:var(--ng)">再生できませんでした。</b>音源フォルダの場所を確認してください。`}})};
   $("#start").onclick=()=>{stopAudio();resetAll();go("intro",{sec:firstSec()})};
   $("#recsBtn").onclick=()=>{stopAudio();go("recs")};
+  main.querySelectorAll("[data-resume]").forEach(b=>b.onclick=()=>resumeProgress(b.dataset.resume));
+  main.querySelectorAll("[data-pgdel]").forEach(b=>b.onclick=()=>{if(!confirmDel(b))return;dropProgress(b.dataset.pgdel);home()});
   $("#resBtn").onclick=()=>{stopAudio();S.rg=S.grade;go("results")};
   recAll().then(a=>{const b=$("#recsBtn");if(b&&a.length)b.textContent=`録音の振り返り（${a.length}回分）`});
   if($("#repick"))$("#repick").onclick=()=>{stopAudio();EX=null;setup()};
@@ -814,7 +884,7 @@ function home(){
 /* ===================== 説明画面 ===================== */
 function introLines(){
   const g=G();
-  if(S.sec==="speak")return["本番の音源で、面接委員が英語で指示や質問をします。",`${g.speak.introLine||`問題カード${g.speak.card}のパッセージを20秒間黙読したあと、音読します。続いて質問No.1〜No.${g.speak.qs.length}に答えます。`}`,"マイクのアイコンが<b>赤色</b>になっている間が解答時間で、その間のあなたの声を録音します。赤くなる前に話し始めないでください。","解答時間が終わると自動で次に進みます。質問を聞き逃したときは「もう一度聞く」を押せますが、本番では評価に影響する場合があります。"];
+  if(S.sec==="speak")return["本番の音源で、面接委員が英語で指示や質問をします。",`${g.speak.introLine||`問題カード${g.speak.card}のパッセージを20秒間黙読したあと、音読します。続いて質問No.1〜No.${g.speak.qs.length}に答えます。`}`,"マイクのアイコンが<b>赤色</b>になっている間が解答時間で、その間のあなたの声を録音します。赤くなる前に話し始めないでください。","途中で中断するときは、右上の「中止」から「一時保存してトップに戻る」を選ぶと、あとで続きから再開できます。","解答時間が終わると自動で次に進みます。質問を聞き逃したときは「もう一度聞く」を押せますが、本番では評価に影響する場合があります。"];
   if(S.sec==="listen")return[`全${LQ().length}問、第1部〜第${Object.keys(g.listen_parts).length}部です。各部の最初に説明の音声が流れます（「説明をとばす」で省略できます）。`,"解答時間が終わると自動で次の問題に進み、前の問題には戻れません。","選択肢が放送される問題は、画面には番号だけが表示されます。"];
   const both=S.scope==="all";
   return[S.mode==="free"?"制限時間はありません。経過時間が表示されます。":`制限時間は<b>${both?"リーディングとライティング合わせて":""}${limitMin()}分</b>です。${both?"時間配分は自由です。":""}`,
@@ -989,7 +1059,7 @@ function listen(){
   const lk="l"+S.i;
   tool(`<span class="msg">解答時間が終わると自動で次の問題に進みます。前の問題には戻れません。</span><div class="grp"><button class="btn flag uns" id="lmk" aria-pressed="${S.mk[lk]==="uns"}">？ 自信なし</button><button class="btn primary" id="nx" disabled>次へ</button></div>`);
   $("#lmk").onclick=()=>{setMk(lk,"uns");$("#lmk").setAttribute("aria-pressed",S.mk[lk]==="uns")};
-  main.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{S.la[S.i]=+b.dataset.k;main.querySelectorAll(".opt").forEach(x=>x.setAttribute("aria-checked",x===b))});
+  main.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{S.la[S.i]=+b.dataset.k;saveProgress();main.querySelectorAll(".opt").forEach(x=>x.setAttribute("aria-checked",x===b))});
   $("#nx").onclick=next;
   const ic=$("#ic"),lb=$("#lbl"),bmi=$("#bmi");let last="";
   setTimeout(()=>{if(run!==S.run)return;play(it.f,{onEnd:next,onErr:errFn,onTime:t=>{
@@ -1020,9 +1090,10 @@ function rwTimer(){
 function rw(){
   S.run++;if(S.ov)return overview();
   const R=RW(),x=R[S.i];if(x.t==="r")readQ(x.k);else writeQ(x.k);
-  tool(`<div class="grp"><button class="btn" id="ovb">問題一覧</button><button class="btn flag" data-m="rev" aria-pressed="${mkOf(S.i)==="rev"}">⚑ 見直し</button><button class="btn flag uns" data-m="uns" aria-pressed="${mkOf(S.i)==="uns"}">？ 自信なし</button></div>
+  tool(`<div class="grp"><button class="btn" id="ovb">問題一覧</button><button class="btn flag" data-m="rev" aria-pressed="${mkOf(S.i)==="rev"}">⚑ 見直し</button><button class="btn flag uns" data-m="uns" aria-pressed="${mkOf(S.i)==="uns"}">？ 自信なし</button><button class="btn" id="pgSave">一時保存</button></div>
     <div class="grp"><button class="btn" id="pv" ${S.i===0?"disabled":""}>前へ</button><button class="btn primary" id="nx">${S.i<R.length-1?"次へ":"問題一覧へ"}</button></div>`);
   $("#ovb").onclick=()=>{S.ov=true;rw()};
+  $("#pgSave").onclick=()=>pgToast(saveProgress()?"一時保存しました（自動でも保存しています）":"保存できませんでした");
   document.querySelectorAll("#toolin [data-m]").forEach(b=>b.onclick=()=>{setMk(mkKey(S.i),b.dataset.m);document.querySelectorAll("#toolin [data-m]").forEach(x=>x.setAttribute("aria-pressed",mkOf(S.i)===x.dataset.m))});
   $("#pv").onclick=()=>{S.i--;rw();window.scrollTo(0,0)};
   $("#nx").onclick=()=>{if(S.i<R.length-1)S.i++;else S.ov=true;rw();window.scrollTo(0,0)};
@@ -1043,7 +1114,7 @@ function readQ(k){
     <div class="qframe"><p class="direc">${G().rdir[it.p]}</p>
       ${it.pas?`<div class="split"><div class="pane scroll">${passageHTML(it.pas)}</div><div class="pane stack">${stem}${opts}</div></div>`:`${stem}${opts}`}
     </div></div>`;
-  main.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{S.ra[k]=+b.dataset.k;main.querySelectorAll(".opt").forEach(x=>x.setAttribute("aria-checked",x===b))});
+  main.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{S.ra[k]=+b.dataset.k;saveProgress();main.querySelectorAll(".opt").forEach(x=>x.setAttribute("aria-checked",x===b))});
 }
 function writeQ(k){
   const it=G().write[k];
@@ -1060,7 +1131,7 @@ function writeQ(k){
         </div></div></div></div>`;
   const ta=$("#ta"+k),wc=$("#wc");
   const upd=()=>{wc.innerHTML=`<span>語数：<b>${wcount(ta.value)}</b>語</span><span>語数の目安 ${it.min}語～${it.max}語</span>`};
-  ta.oninput=()=>{S.wa[k]=ta.value;upd()};upd();
+  ta.oninput=()=>{S.wa[k]=ta.value;upd()};ta.onblur=saveProgress;upd();
 }
 function overview(){
   const R=RW(),un=R.filter((_,n)=>!answered(n)).length,fl=R.filter((_,n)=>mkOf(n)==="rev").length,us=R.filter((_,n)=>mkOf(n)==="uns").length;
@@ -1145,7 +1216,7 @@ function result(){
       <div class="model">解答例：${esc(w.model)}</div>
       <div class="selfrate wself" data-w="${k}">${[["ok","よく書けた"],["mid","一部書けた"],["ng","書けなかった"]].map(([v,l])=>`<button aria-pressed="${S.wself[k]===v}" data-v="${v}">${l}</button>`).join("")}</div></div>`).join("")}
     <div id="aibox"></div></div></details>`:""}
-  <div class="row"><button class="btn primary" id="again">${g.label}${S.scope==="all"?"":"・"+SCOPES.find(x=>x[0]===S.scope)[1]}をもう一度受験する</button><button class="btn" id="toRes">これまでの結果と合格ライン</button><button class="btn" id="hm">トップに戻る</button></div>`;
+  <div class="row"><button class="btn primary" id="again">${g.label}${S.scope==="all"?"":"・"+SCOPES.find(x=>x[0]===S.scope)[1]}をもう一度受験する</button><button class="btn" id="delThis">${S.noSave?"この結果は記録から削除しました":"この結果を記録から削除"}</button><button class="btn" id="toRes">これまでの結果と合格ライン</button><button class="btn" id="hm">トップに戻る</button></div>`;
   main.querySelectorAll(".onlymk").forEach(c=>c.onchange=()=>c.closest(".dbody").classList.toggle("only",c.checked));
   main.querySelectorAll(".wself").forEach(gr=>gr.querySelectorAll("button").forEach(b=>b.onclick=()=>{
     S.wself[gr.dataset.w]=b.dataset.v;gr.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));saveResult()}));
@@ -1160,6 +1231,8 @@ function result(){
   });
   $("#again").onclick=()=>{stopAudio();resetAll();go("intro",{sec:firstSec()})};
   if($("#toRecs"))$("#toRecs").onclick=()=>{stopAudio();go("recs")};wireAudios(main);
+  $("#delThis").disabled=!!S.noSave;
+  $("#delThis").onclick=async()=>{const b=$("#delThis");if(!confirmDel(b))return;S.noSave=true;await resDB(st=>st.delete(S.aid));b.textContent="この結果は記録から削除しました";b.disabled=true};
   $("#toRes").onclick=()=>{stopAudio();S.rg=g.key;go("results")};saveResult();
   $("#hm").onclick=()=>{stopAudio();resetAll();go("home")};
   setupAI();
